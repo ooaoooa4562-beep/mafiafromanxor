@@ -1,4 +1,5 @@
 import json
+from django.db.models import Q
 from uuid import UUID
 
 from asgiref.sync import async_to_sync
@@ -114,30 +115,23 @@ def action(request, code):
 def stats(request):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'authentication_required'}, status=401)
-    matches = list(
-        request.user.room_memberships.filter(game_participant__match__phase='finished')
-        .select_related('game_participant__match__room')
-        .order_by('-game_participant__match__finished_at')[:50]
-    )
-    played = len(matches)
-    wins = 0
-    mafia_games = 0
-    for membership in matches:
-        participant = membership.game_participant
-        match = participant.match
-        if participant.role == 'mafia':
-            mafia_games += 1
-        if (participant.role == 'mafia' and match.winner == 'mafia') or (participant.role != 'mafia' and match.winner == 'town'):
-            wins += 1
+    completed = request.user.room_memberships.filter(game_participant__match__phase='finished')
+    played = completed.count()
+    wins = completed.filter(
+        Q(game_participant__role='mafia', game_participant__match__winner='mafia') |
+        (~Q(game_participant__role='mafia') & Q(game_participant__match__winner='town'))
+    ).count()
+    mafia_games = completed.filter(game_participant__role='mafia').count()
     recent = []
-    for membership in matches[:10]:
+    for membership in completed.select_related('game_participant__match__room').order_by('-game_participant__match__finished_at')[:10]:
         participant = membership.game_participant
         match = participant.match
+        won = (participant.role == 'mafia' and match.winner == 'mafia') or (participant.role != 'mafia' and match.winner == 'town')
         recent.append({
             'room': match.room.name,
             'role': participant.role,
             'winner': match.winner,
-            'result': 'win' if ((participant.role == 'mafia' and match.winner == 'mafia') or (participant.role != 'mafia' and match.winner == 'town')) else 'loss',
+            'result': 'win' if won else 'loss',
             'finished_at': match.finished_at.isoformat() if match.finished_at else None,
         })
     return JsonResponse({

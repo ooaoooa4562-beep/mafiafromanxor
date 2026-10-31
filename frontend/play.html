@@ -14,7 +14,8 @@ body{font-size:16px}.panel h2{font-size:22px}.muted{font-size:14px;line-height:1
 <section class="status chat-panel"><div class="chat-head"><strong>Мини-чат комнаты</strong><span class="small" id="chatStatus">Подключение…</span></div><div class="chat-messages" id="chatMessages" aria-live="polite"><div class="chat-empty">Сообщения появятся здесь. Поздоровайся с игроками!</div></div><form class="chat-form" id="chatForm"><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Напиши сообщение…" aria-label="Сообщение в чат"><button class="btn" id="chatSend" type="submit">Отправить</button></form><div class="small" id="chatError" role="status"></div></section><div class="status"><strong>Голосовая связь</strong><div class="muted" id="voiceStatus">Голосовой канал ещё не подключён.</div><div class="voice"><button class="btn" id="voiceJoin">🎙 Подключить микрофон</button><button class="btn ghost" id="voiceMute" disabled>Выключить микрофон</button><button class="btn ghost" id="voiceLeave" disabled>Отключить голос</button></div><div class="small">Голосовые каналы ограничиваются ролью и фазой партии. Нужен HTTPS или localhost.</div><div id="audioPeers"></div></div></div></main>
 <aside class="panel"><h2>Твоя статистика</h2><div id="stats" class="notice">Загружаем статистику…</div><div style="height:18px"></div><h2>Друзья</h2><p class="muted">Добавляй игроков по логину и принимай приглашения.</p><div class="field"><label>ЛОГИН ИЛИ ИГРОВОЙ НИК</label><div style="display:flex;gap:7px"><input id="friendName" placeholder="Логин или ник игрока" style="min-width:0;flex:1"><button class="btn ghost" id="addFriend">＋</button></div></div><div class="error" id="friendError"></div><div id="friendList" class="muted">Загрузка списка друзей…</div><div class="notice">Подсказка: поделись UUID комнаты с друзьями, чтобы они могли присоединиться.</div></aside></div></section></div>
 <script>
-const $=id=>document.getElementById(id);let authMode='login',me=null,roomCode=null,roomState=null,ws=null,localStream=null,voiceJoined=false,muted=false;const peers=new Map(),pendingIce=new Map();
+const $=id=>document.getElementById(id);let authMode='login',me=null,roomCode=null,roomState=null,ws=null,localStream=null,voiceJoined=false,muted=false;const peers=new Map(),pendingIce=new Map();let iceServersPromise=null;
+async function getIceServers(){if(!iceServersPromise)iceServersPromise=api('/api/voice/ice-servers/').then(data=>data.ice_servers).catch(()=>[{urls:'stun:stun.l.google.com:19302'}]);return iceServersPromise}
 function cookie(name){return document.cookie.split('; ').find(v=>v.startsWith(name+'='))?.split('=').slice(1).join('=')||''}
 async function api(path,method='GET',body){const headers={};if(body!==undefined)headers['Content-Type']='application/json';if(!['GET','HEAD'].includes(method))headers['X-CSRFToken']=decodeURIComponent(cookie('csrftoken'));const r=await fetch(path,{method,headers,credentials:'same-origin',body:body===undefined?undefined:JSON.stringify(body)});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.detail||data.error||('HTTP '+r.status));return data}
 function showError(id,msg){$(id).textContent=msg||''}
@@ -59,7 +60,7 @@ function sendSignal(type,payload){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(
 async function createPeer(id,initiate){
  id=Number(id);if(peers.has(id))return peers.get(id);
  const stream=await ensureStream();
- const configured=Array.isArray(window.MAFIA_ICE_SERVERS)&&window.MAFIA_ICE_SERVERS.length?window.MAFIA_ICE_SERVERS:[{urls:'stun:stun.l.google.com:19302'}];
+ const configured=await getIceServers();
  const pc=new RTCPeerConnection({iceServers:configured});
  peers.set(id,pc);
  stream.getAudioTracks().forEach(track=>pc.addTrack(track,stream));

@@ -1,0 +1,39 @@
+databases:
+  - name: mafia-anxor-db
+    plan: free
+    region: frankfurt
+    databaseName: mafia_anxor
+    user: mafia_anxor
+
+services:
+  - type: keyvalue
+    name: mafia-anxor-redis
+    plan: free
+    region: frankfurt
+    ipAllowList: []
+
+  - type: web
+    name: mafia-from-anxor
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt && cd backend && python manage.py collectstatic --noinput
+    preDeployCommand: cd backend && python manage.py migrate --noinput
+    startCommand: cd backend && daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    healthCheckPath: /
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_TIME_ZONE
+        value: Asia/Tashkent
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mafia-anxor-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: mafia-anxor-redis
+          type: keyvalue
+          property: connectionString

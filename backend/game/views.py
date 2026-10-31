@@ -1,4 +1,6 @@
 import json
+from datetime import timedelta
+from django.conf import settings
 from django.db.models import Q
 from uuid import UUID
 
@@ -10,7 +12,7 @@ from django.views.decorators.http import require_GET, require_POST
 from rooms.models import Room
 
 from .models import GameMatch
-from .services import GameRuleError, start_match, submit_action
+from .services import GameRuleError, advance_if_expired, start_match, submit_action
 
 
 def _room_state(room, user):
@@ -36,6 +38,8 @@ def _room_state(room, user):
             'phase': match.phase,
             'round': match.round_number,
             'winner': match.winner or None,
+            'phase_started_at': match.phase_started_at.isoformat(),
+            'phase_ends_at': (match.phase_started_at + timedelta(seconds=(settings.GAME_NIGHT_SECONDS if match.phase == 'night' else settings.GAME_DAY_SECONDS))).isoformat(),
             'participants': [
                 {'user_id': p.room_player.user_id, 'nickname': p.room_player.user.nickname or p.room_player.user.username,
                  'is_alive': p.is_alive}
@@ -90,6 +94,9 @@ def state(request, code):
     room = Room.objects.filter(code=room_code, players__user=request.user).select_related('owner').first()
     if room is None:
         return JsonResponse({'error': 'room_not_found'}, status=404)
+    if advance_if_expired(room_code):
+        _broadcast(room_code, 'game.updated')
+        room.refresh_from_db()
     return JsonResponse(_room_state(room, request.user))
 
 

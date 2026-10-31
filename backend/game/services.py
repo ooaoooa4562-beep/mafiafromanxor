@@ -155,7 +155,7 @@ def submit_action(room_code, user, target_user_id):
 
         if target is None:
             raise GameRuleError('Цель не найдена или уже выбыла.', 400)
-        if target.room_player.user_id == user.id and actor.role != 'doctor':
+        if target.room_player.user_id == user.id and not (match.phase == 'night' and actor.role == 'doctor'):
             raise GameRuleError('Нельзя выбрать самого себя.', 400)
 
         previous = GameAction.objects.filter(match=match, round_number=match.round_number, action_type=action_type, actor=actor.room_player).first()

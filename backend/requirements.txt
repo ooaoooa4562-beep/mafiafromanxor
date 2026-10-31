@@ -1,0 +1,5 @@
+Django>=5.2,<6.2
+ djangorestframework>=3.16,<4
+ channels>=4.2,<5
+ channels-redis>=4.2,<5
+ Pillow>=11,<13

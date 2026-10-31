@@ -35,6 +35,7 @@ if not DEBUG and SECRET_KEY == 'dev-only-change-me-before-deploying':
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -137,6 +138,9 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'ru-ru'
 
 TIME_ZONE = os.environ.get('DJANGO_TIME_ZONE', 'Asia/Tashkent')
+
+GAME_NIGHT_SECONDS = max(5, int(os.environ.get('GAME_NIGHT_SECONDS', '30')))
+GAME_DAY_SECONDS = max(10, int(os.environ.get('GAME_DAY_SECONDS', '60')))
 
 USE_I18N = True
 

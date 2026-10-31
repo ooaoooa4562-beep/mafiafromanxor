@@ -1,0 +1,5 @@
+Django>=6.1,<6.2
+djangorestframework>=3.16,<4
+channels[daphne]>=4.3,<5
+channels-redis>=4.3,<5
+Pillow>=11,<13

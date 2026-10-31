@@ -60,7 +60,7 @@ def register(request):
 @require_POST
 def sign_in(request):
     data = _payload(request)
-    if data is None:
+    if not isinstance(data, dict):
         return JsonResponse({'error': 'invalid_json'}, status=400)
     username = str(data.get('username', '')).strip()
     password = str(data.get('password', ''))

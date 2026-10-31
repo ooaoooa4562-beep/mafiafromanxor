@@ -2,10 +2,18 @@ import json
 from uuid import UUID
 
 from django.db import transaction
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from .models import Room, RoomPlayer
+
+
+def _broadcast_room(code, event='room.updated'):
+    layer = get_channel_layer()
+    if layer:
+        async_to_sync(layer.group_send)(f'room_{code.hex}', {'type': 'room.event', 'event': event})
 
 
 def _auth_required(request):
@@ -87,10 +95,45 @@ def join_room(request, code):
             return JsonResponse({'error': 'room_not_found'}, status=404)
         if room.status != 'waiting':
             return JsonResponse({'error': 'room_unavailable'}, status=409)
-        membership, created = RoomPlayer.objects.get_or_create(room=room, user=request.user)
-        if not created:
+        membership = RoomPlayer.objects.filter(room=room, user=request.user).first()
+        if membership:
             return JsonResponse({'room': _room_payload(room), 'already_joined': True})
-        if room.players.count() > room.max_players:
-            membership.delete()
-            return JsonResponse({'error': 'room_full'}, status=409)
+        if room.players.count() >= room.max_players:
+            return JsonResponse({'error': 'room_full', 'detail': 'В комнате нет свободных мест.'}, status=409)
+        current = list(RoomPlayer.objects.select_related('room').filter(user=request.user))
+        if any(item.room.status == 'playing' for item in current):
+            return JsonResponse({'error': 'already_in_game', 'detail': 'Сначала закончи текущую партию.'}, status=409)
+        RoomPlayer.objects.filter(user=request.user).delete()
+        RoomPlayer.objects.create(room=room, user=request.user, is_ready=False)
+    _broadcast_room(room_code)
     return JsonResponse({'room': _room_payload(room)}, status=200)
+
+
+@require_POST
+def leave_room(request, code):
+    if _auth_required(request):
+        return JsonResponse({'error': 'authentication_required'}, status=401)
+    try:
+        room_code = UUID(str(code))
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'room_not_found'}, status=404)
+    with transaction.atomic():
+        room = Room.objects.select_for_update().filter(code=room_code).first()
+        if room is None:
+            return JsonResponse({'error': 'room_not_found'}, status=404)
+        membership = RoomPlayer.objects.select_for_update().filter(room=room, user=request.user).first()
+        if membership is None:
+            return JsonResponse({'left': True, 'already_left': True})
+        if room.status == 'playing':
+            return JsonResponse({'error': 'game_in_progress', 'detail': 'Нельзя покинуть комнату во время партии.'}, status=409)
+        membership.delete()
+        remaining = list(room.players.select_related('user').order_by('joined_at'))
+        if not remaining:
+            room.delete()
+            _broadcast_room(room_code)
+            return JsonResponse({'left': True, 'room_deleted': True})
+        if room.owner_id == request.user.pk:
+            room.owner = remaining[0].user
+            room.save(update_fields=['owner'])
+    _broadcast_room(room_code)
+    return JsonResponse({'left': True})

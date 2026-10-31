@@ -38,7 +38,7 @@ Game: POST `/api/game/<uuid>/start/`, GET `/api/game/<uuid>/state/`, POST `/api/
 
 ## WebSockets
 
-- Чат: `ws://localhost:8000/ws/rooms/<room-uuid>/chat/` — участники комнаты, до 500 символов.
+- Чат: `ws://localhost:8000/ws/rooms/<room-uuid>/chat/` — каналы по фазам: лобби, мафия ночью, живые днём и выбывшие отдельно; сообщения до 500 символов.
 - WebRTC signaling: `ws://localhost:8000/ws/rooms/<room-uuid>/voice/` — offer/answer/ICE relay; аудио идёт между браузерами через WebRTC, не через Django.
 
 Голосовые каналы ограничены по фазам: в лобби слышат все, ночью — мафия отдельно, выбывшие отдельно, днём — живые игроки вместе. При смене фазы сервер закрывает старые signaling-соединения. Для реального голоса в разных сетях настрой STUN/TURN (TURN обязателен для надёжного production-соединения); фронтенд должен подключать WebRTC peer connections. Пока UI умеет проверить микрофон, но WebRTC-клиент ещё не подключён.

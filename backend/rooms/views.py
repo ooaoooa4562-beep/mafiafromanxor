@@ -61,7 +61,7 @@ def rooms_collection(request):
         return JsonResponse({'error': 'invalid_max_players', 'detail': 'Допустимо от 4 до 16 игроков.'}, status=400)
 
     with transaction.atomic():
-        # Serialize room changes for this account and release stale memberships first.
+        # Lock the concrete auth model row; request.user itself is a SimpleLazyObject.
         get_user_model().objects.select_for_update().get(pk=request.user.pk)
         RoomPlayer.objects.filter(user=request.user).delete()
         room = Room.objects.create(name=name, owner=request.user, max_players=max_players, is_private=is_private)

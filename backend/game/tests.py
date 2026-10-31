@@ -78,3 +78,30 @@ class GameApiTests(TestCase):
             self.assertEqual(response.status_code, 200, response.content)
         match.refresh_from_db()
         self.assertEqual(match.phase, 'day')
+
+    def test_day_vote_finishes_match_when_mafia_is_eliminated(self):
+        self.client.post(reverse('game_start', kwargs={'code': self.room.code}), data='{}', content_type='application/json')
+        match = GameMatch.objects.get(room=self.room)
+        citizen = match.participants.get(role='citizen')
+        for role in ('mafia', 'doctor', 'detective'):
+            participant = match.participants.get(role=role)
+            self.client.force_login(participant.room_player.user)
+            response = self.client.post(
+                reverse('game_action', kwargs={'code': self.room.code}),
+                data=json.dumps({'target_user_id': citizen.room_player.user_id}),
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 200)
+        mafia = match.participants.get(role='mafia')
+        for participant in match.participants.filter(is_alive=True):
+            self.client.force_login(participant.room_player.user)
+            target = citizen if participant.role == 'mafia' else mafia
+            response = self.client.post(
+                reverse('game_action', kwargs={'code': self.room.code}),
+                data=json.dumps({'target_user_id': target.room_player.user_id}),
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 200)
+        match.refresh_from_db()
+        self.assertEqual(match.phase, 'finished')
+        self.assertEqual(match.winner, 'town')

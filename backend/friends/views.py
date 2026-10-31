@@ -41,7 +41,7 @@ def send_request(request):
         data = json.loads(request.body or '{}')
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({'error': 'invalid_json'}, status=400)
-    username = str(data.get('username', data.get('nickname', ''))).strip()
+    username = str(data.get('username') or data.get('nickname') or data.get('query') or '').strip()
     if not username:
         return JsonResponse({'error': 'username_required', 'detail': 'Введи логин или игровой ник игрока.'}, status=400)
     User = get_user_model()

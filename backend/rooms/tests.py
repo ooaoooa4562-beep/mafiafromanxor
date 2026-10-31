@@ -60,3 +60,43 @@ class RoomApiTests(TestCase):
         self.client.logout()
         response = self.client.get(reverse('rooms_collection'))
         self.assertEqual(response.status_code, 401)
+
+
+    def test_joining_another_room_moves_player_out_of_previous_waiting_room(self):
+        first = Room.objects.create(name='First', owner=self.user, is_private=False)
+        RoomPlayer.objects.create(room=first, user=self.user)
+        second = Room.objects.create(name='Second', owner=self.user, is_private=False)
+        response = self.client.post(
+            reverse('join_room', kwargs={'code': second.code}),
+            data='{}',
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(RoomPlayer.objects.filter(room=first, user=self.user).exists())
+        self.assertTrue(RoomPlayer.objects.filter(room=second, user=self.user).exists())
+        self.assertEqual(RoomPlayer.objects.filter(user=self.user).count(), 1)
+
+    def test_leave_room_removes_membership_and_updates_count(self):
+        room = Room.objects.create(name='Leave me', owner=self.user, is_private=False)
+        RoomPlayer.objects.create(room=room, user=self.user)
+        response = self.client.post(
+            reverse('leave_room', kwargs={'code': room.code}),
+            data='{}',
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(RoomPlayer.objects.filter(room=room, user=self.user).exists())
+        self.assertFalse(Room.objects.filter(pk=room.pk).exists())
+
+    def test_cannot_join_second_room_while_current_room_is_playing(self):
+        current = Room.objects.create(name='Playing', owner=self.user, status='playing')
+        RoomPlayer.objects.create(room=current, user=self.user)
+        target = Room.objects.create(name='Waiting', owner=self.user, is_private=False)
+        response = self.client.post(
+            reverse('join_room', kwargs={'code': target.code}),
+            data='{}',
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(RoomPlayer.objects.filter(room=current, user=self.user).exists())
+        self.assertFalse(RoomPlayer.objects.filter(room=target, user=self.user).exists())

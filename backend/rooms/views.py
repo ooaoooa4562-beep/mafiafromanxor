@@ -45,6 +45,8 @@ def rooms_collection(request):
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({'error': 'invalid_json'}, status=400)
 
+    if not isinstance(data, dict):
+        return JsonResponse({'error': 'invalid_json'}, status=400)
     name = str(data.get('name', '')).strip()
     try:
         max_players = int(data.get('max_players', 10))
@@ -71,6 +73,8 @@ def join_room(request, code):
     try:
         data = json.loads(request.body or '{}')
     except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'invalid_json'}, status=400)
+    if not isinstance(data, dict):
         return JsonResponse({'error': 'invalid_json'}, status=400)
     try:
         room_code = UUID(str(code))

@@ -69,6 +69,10 @@ def rooms_collection(request):
         return JsonResponse({'error': 'invalid_max_players', 'detail': 'Допустимо от 4 до 16 игроков.'}, status=400)
 
     with transaction.atomic():
+        current = list(RoomPlayer.objects.select_related('room').filter(user=request.user))
+        if any(item.room.status == 'playing' for item in current):
+            return JsonResponse({'error': 'already_in_game', 'detail': 'Сначала закончи текущую партию.'}, status=409)
+        RoomPlayer.objects.filter(user=request.user).delete()
         room = Room.objects.create(name=name, owner=request.user, max_players=max_players, is_private=is_private)
         RoomPlayer.objects.create(room=room, user=request.user, is_ready=True)
     return JsonResponse({'room': _room_payload(room)}, status=201)

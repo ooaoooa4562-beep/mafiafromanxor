@@ -71,13 +71,15 @@ def join_room(request, code):
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({'error': 'invalid_json'}, status=400)
     try:
-        room = Room.objects.select_for_update().get(code=UUID(str(code)))
-    except (Room.DoesNotExist, ValueError, TypeError):
+        room_code = UUID(str(code))
+    except (ValueError, TypeError):
         return JsonResponse({'error': 'room_not_found'}, status=404)
 
     with transaction.atomic():
-        room = Room.objects.select_for_update().filter(pk=room.pk).first()
-        if room is None or room.status != 'waiting':
+        room = Room.objects.select_for_update().filter(code=room_code).first()
+        if room is None:
+            return JsonResponse({'error': 'room_not_found'}, status=404)
+        if room.status != 'waiting':
             return JsonResponse({'error': 'room_unavailable'}, status=409)
         membership, created = RoomPlayer.objects.get_or_create(room=room, user=request.user)
         if not created:

@@ -6,7 +6,7 @@
 
 - `frontend/index.html` — адаптивный UI-прототип: список комнат, создание комнаты, вход по коду, игровая комната, чат-интерфейс и локальная проверка микрофона.
 - `backend/accounts/` — регистрация, вход/выход по Django session, CSRF token и профиль пользователя.
-- `backend/rooms/` — API комнат, участники, готовность и миграции.
+- `backend/rooms/` — API комнат, участники, готовность, выход/передача владельца и WebSocket-чат.
 - `backend/game/` — серверное назначение ролей, скрытая выдача своей роли, действия ночью, дневное голосование, таймеры фаз и определение победителя.
 - `backend/voice/` — аутентифицированный WebSocket relay для WebRTC SDP/ICE сигналинга с проверкой членства в комнате.
 - Django settings читают секреты из окружения; Redis channel layer включается через REDIS_URL.
@@ -31,7 +31,7 @@ python manage.py runserver
 
 Auth: GET `/api/auth/csrf/`, POST `/api/auth/register/`, POST `/api/auth/login/`, POST `/api/auth/logout/`, GET `/api/auth/me/`.
 
-Rooms: GET/POST `/api/rooms/`, GET `/api/rooms/<uuid>/`, POST `/api/rooms/<uuid>/join/`, POST `/api/rooms/<uuid>/ready/`.
+Rooms: GET/POST `/api/rooms/`, GET `/api/rooms/<uuid>/`, POST `/api/rooms/<uuid>/join/`, POST `/api/rooms/<uuid>/ready/`, POST `/api/rooms/<uuid>/leave/`.
 
 Game: POST `/api/game/<uuid>/start/`, GET `/api/game/<uuid>/state/`, POST `/api/game/<uuid>/action/`, POST `/api/game/<uuid>/advance/`.
 
@@ -43,7 +43,7 @@ Game: POST `/api/game/<uuid>/start/`, GET `/api/game/<uuid>/state/`, POST `/api/
 
 `ws://localhost:8000/ws/rooms/<room-uuid>/voice/` — только для авторизованной Django session и участника существующей незавершённой комнаты. Сообщения offer/answer/candidate маршрутизируются целевому user_id. Это signaling foundation, не готовый voice UI: клиентская WebRTC mesh-связь, TURN/STUN и проверка игровых аудиоканалов по фазам ещё требуют интеграции и тестирования.
 
-Для нескольких процессов настройте Redis (`REDIS_URL=redis://...`). InMemoryChannelLayer предназначен только для локальной разработки.
+WebSocket-чат: `ws://localhost:8000/ws/rooms/<room-uuid>/chat/` (только участники комнаты, сообщения до 500 символов).\n\nДля нескольких процессов настройте Redis (`REDIS_URL=redis://...`). InMemoryChannelLayer предназначен только для локальной разработки.
 
 ## Запуск UI-прототипа
 

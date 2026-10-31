@@ -16,12 +16,13 @@ class RoomPlayerSerializer(serializers.ModelSerializer):
 
 class RoomSerializer(serializers.ModelSerializer):
     owner_name = serializers.SerializerMethodField()
+    owner_id = serializers.IntegerField(read_only=True)
     players = RoomPlayerSerializer(source="members", many=True, read_only=True)
     player_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
-        fields = ("name", "code", "owner_name", "max_players", "is_private", "status", "created_at", "players", "player_count")
+        fields = ("name", "code", "owner_id", "owner_name", "max_players", "is_private", "status", "created_at", "players", "player_count")
         read_only_fields = ("code", "owner_name", "status", "created_at", "players", "player_count")
 
     def get_owner_name(self, obj):

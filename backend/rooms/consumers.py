@@ -94,6 +94,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             if expected != self.voice_group:
                 old_group = self.voice_group
                 self.voice_group = None
+                await self.channel_layer.group_send(old_group, {'type': 'voice.presence', 'user_id': self.user_id, 'state': 'left'})
                 await self.channel_layer.group_discard(old_group, self.channel_name)
                 await self.send_json({'type': 'voice.rejoin_required'})
 

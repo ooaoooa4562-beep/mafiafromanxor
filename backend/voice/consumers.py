@@ -3,32 +3,45 @@ import json
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
+from game.models import Game, PlayerRole
 from rooms.models import RoomPlayer
 
 
 @database_sync_to_async
-def user_can_use_voice(room_code, user_id):
-    return RoomPlayer.objects.filter(
-        room__code=room_code,
-        room__status__in=("waiting", "playing"),
-        user_id=user_id,
-    ).exists()
+def voice_channel_for_user(room_code, user_id):
+    member = RoomPlayer.objects.select_related("room").filter(room__code=room_code, user_id=user_id).first()
+    if not member:
+        return None
+    room = member.room
+    if room.status == "waiting":
+        return "lobby"
+    game = Game.objects.filter(room=room).first()
+    if not game or game.phase == "finished":
+        return "lobby"
+    role = PlayerRole.objects.filter(game=game, player=member).first()
+    if not role:
+        return None
+    if not role.is_alive:
+        return "dead"
+    if game.phase == "night":
+        return "mafia" if role.role == "mafia" else None
+    return "town"
 
 
 class RoomVoiceSignalingConsumer(AsyncJsonWebsocketConsumer):
-    """Authenticated WebRTC signaling relay. Audio itself travels over WebRTC."""
+    """Role-aware WebRTC signaling. Audio itself travels peer-to-peer."""
 
     async def connect(self):
         self.user = self.scope.get("user")
         self.room_code = self.scope["url_route"]["kwargs"]["room_code"]
-        self.group_name = f"voice_{self.room_code.hex}"
-        self.joined_group = False
         if not self.user or not self.user.is_authenticated:
             await self.close(code=4401)
             return
-        if not await user_can_use_voice(self.room_code, self.user.pk):
+        self.voice_channel = await voice_channel_for_user(self.room_code, self.user.pk)
+        if not self.voice_channel:
             await self.close(code=4403)
             return
+        self.group_name = f"voice_{self.room_code.hex}_{self.voice_channel}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         self.joined_group = True
         await self.accept()
@@ -44,6 +57,9 @@ class RoomVoiceSignalingConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
+        if await voice_channel_for_user(self.room_code, self.user.pk) != self.voice_channel:
+            await self.close(code=4409)
+            return
         if not isinstance(content, dict):
             await self.close(code=4400)
             return
@@ -66,14 +82,13 @@ class RoomVoiceSignalingConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def voice_signal(self, event):
-        if event["target_user_id"] != self.user.pk:
-            return
-        await self.send_json({
-            "type": event["signal_type"],
-            "sender_user_id": event["sender_user_id"],
-            "payload": event["payload"],
-        })
+        if event["target_user_id"] == self.user.pk:
+            await self.send_json({"type": event["signal_type"], "sender_user_id": event["sender_user_id"], "payload": event["payload"]})
 
     async def voice_presence(self, event):
         if event["user_id"] != self.user.pk:
             await self.send_json({"type": event["event"], "user_id": event["user_id"]})
+
+    async def voice_phase_changed(self, event):
+        await self.send_json({"type": "phase_changed"})
+        await self.close(code=4409)

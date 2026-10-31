@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from rooms.models import Room, RoomPlayer
+from voice.events import notify_voice_phase_change
 from .models import Game, PlayerRole, GameAction
 from .serializers import GameStateSerializer
 from .services import advance_game, start_game
@@ -18,6 +19,7 @@ class GameStartView(APIView):
     def post(self, request, code):
         room = get_object_or_404(Room, code=code)
         game = start_game(room, request.user)
+        notify_voice_phase_change(room.code)
         return Response(GameStateSerializer(game, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
@@ -75,5 +77,8 @@ class GameAdvanceView(APIView):
         if room.owner_id != request.user.id:
             return Response({"detail": "Переводить фазу может только создатель комнаты."}, status=status.HTTP_403_FORBIDDEN)
         game = get_object_or_404(Game, room=room)
+        old_phase = game.phase
         game = advance_game(game)
+        if game.phase != old_phase:
+            notify_voice_phase_change(room.code)
         return Response(GameStateSerializer(game, context={"request": request}).data)

@@ -4,12 +4,11 @@
 
 ## Реализованная основа
 
-- `frontend/index.html` — адаптивный UI-прототип: список комнат, создание комнаты, вход по коду, игровая комната, чат-интерфейс и локальная проверка микрофона.
+- `frontend/index.html` и `frontend/app.js` — адаптивный UI, регистрация/вход, список и создание комнат, готовность, серверные роли/фазы, действия игроков и WebSocket-чат.
 - `backend/accounts/` — регистрация, вход/выход по Django session, CSRF token и профиль пользователя.
 - `backend/rooms/` — API комнат, участники, готовность, выход/передача владельца и WebSocket-чат.
-- `backend/game/` — серверное назначение ролей, скрытая выдача своей роли, действия ночью, дневное голосование, таймеры фаз и определение победителя.
-- `backend/voice/` — аутентифицированный WebSocket relay для WebRTC SDP/ICE сигналинга с проверкой членства в комнате.
-- Django settings читают секреты из окружения; Redis channel layer включается через REDIS_URL.
+- `backend/game/` — серверное назначение ролей, скрытая выдача своей роли, ночные действия, дневное голосование, таймеры фаз и определение победителя.
+- `backend/voice/` — WebRTC signaling с проверкой участника и голосового канала: лобби, мафия ночью, живые игроки днём, отдельный канал выбывших.
 
 ## Запуск backend локально
 
@@ -25,7 +24,7 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Файл backend/.env автоматически загружается. Для локальной разработки оставьте DJANGO_DEBUG=true и замените DJANGO_SECRET_KEY на длинную случайную строку. Django admin доступен по /admin/.
+Главная страница и frontend раздаются Django с одного origin: http://localhost:8000/. Файл backend/.env загружается автоматически. Для локальной разработки оставьте DJANGO_DEBUG=true и замените DJANGO_SECRET_KEY на длинную случайную строку.
 
 ## API
 
@@ -35,20 +34,17 @@ Rooms: GET/POST `/api/rooms/`, GET `/api/rooms/<uuid>/`, POST `/api/rooms/<uuid>
 
 Game: POST `/api/game/<uuid>/start/`, GET `/api/game/<uuid>/state/`, POST `/api/game/<uuid>/action/`, POST `/api/game/<uuid>/advance/`.
 
-Все игровые endpoints требуют авторизованного участника комнаты. Начать игру может создатель после того, как минимум 4 игрока присоединились и все нажали «готов». Роли видит только сам игрок. Ночью доступны действия мафии/доктора/комиссара, днём — обсуждение, затем голосование. Переход фаз сейчас запускается запросом владельца комнаты после истечения таймера; для production нужен серверный scheduler/worker и широковещательные события.
+Начать игру может создатель после того, как минимум 4 игрока присоединились и все отметили готовность. Роли видит только сам игрок. Ночью доступны действия мафии/доктора/комиссара, затем день и голосование. Владелец запускает переход после таймера; автоматический scheduler/worker ещё нужен для production.
 
-Для браузера используй same-origin deployment, credentials включены, а CSRF token передавай в заголовке X-CSRFToken при POST/PUT/PATCH/DELETE.
+## WebSockets
 
-## Голосовой signaling
+- Чат: `ws://localhost:8000/ws/rooms/<room-uuid>/chat/` — участники комнаты, до 500 символов.
+- WebRTC signaling: `ws://localhost:8000/ws/rooms/<room-uuid>/voice/` — offer/answer/ICE relay; аудио идёт между браузерами через WebRTC, не через Django.
 
-`ws://localhost:8000/ws/rooms/<room-uuid>/voice/` — только для авторизованной Django session и участника существующей незавершённой комнаты. Сообщения offer/answer/candidate маршрутизируются целевому user_id. Это signaling foundation, не готовый voice UI: клиентская WebRTC mesh-связь, TURN/STUN и проверка игровых аудиоканалов по фазам ещё требуют интеграции и тестирования.
+Голосовые каналы ограничены по фазам: в лобби слышат все, ночью — мафия отдельно, выбывшие отдельно, днём — живые игроки вместе. При смене фазы сервер закрывает старые signaling-соединения. Для реального голоса в разных сетях настрой STUN/TURN (TURN обязателен для надёжного production-соединения); фронтенд должен подключать WebRTC peer connections. Пока UI умеет проверить микрофон, но WebRTC-клиент ещё не подключён.
 
-WebSocket-чат: `ws://localhost:8000/ws/rooms/<room-uuid>/chat/` (только участники комнаты, сообщения до 500 символов).\n\nДля нескольких процессов настройте Redis (`REDIS_URL=redis://...`). InMemoryChannelLayer предназначен только для локальной разработки.
-
-## Запуск UI-прототипа
-
-Из корня репозитория: `python -m http.server 8080`, затем откройте `http://localhost:8080/frontend/`. Комнаты и чат пока демонстрационные и не связаны с API. Для реального использования UI нужно раздавать с того же origin, что и API, либо настроить CORS и cookie policy.
+Для нескольких процессов настрой Redis (`REDIS_URL=redis://...`). InMemoryChannelLayer только для локальной разработки.
 
 ## Перед production
 
-Секретный ключ, ранее закоммиченный в истории репозитория, нужно ротировать и больше не использовать. Установить DJANGO_SECRET_KEY, DJANGO_DEBUG=false, DJANGO_ALLOWED_HOSTS, Redis, HTTPS, secure cookies, CSRF/CORS policy, TURN server, rate limits и тесты. SQLite оставить только для разработки; для production перейти на PostgreSQL.
+Секретный ключ, ранее закоммиченный в истории репозитория, нужно ротировать. Установить DJANGO_SECRET_KEY, DJANGO_DEBUG=false, DJANGO_ALLOWED_HOSTS, Redis, HTTPS, secure cookies, CSRF/CORS policy, TURN server, rate limits, PostgreSQL, scheduler и тесты. Не коммитить db.sqlite3, __pycache__ и секреты.

@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import migrations, models
+from django.db import migrations
 
 
 def keep_one_membership_per_user(apps, schema_editor):
@@ -15,9 +15,8 @@ def keep_one_membership_per_user(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    # PostgreSQL may reject AddConstraint in the same transaction as deletes
-    # because the deletes leave pending trigger events. Commit the cleanup
-    # before changing the table schema.
+    # Run cleanup in its own migration transaction. PostgreSQL must commit
+    # pending FK trigger events before the table constraint is added.
     atomic = False
 
     dependencies = [
@@ -27,8 +26,4 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(keep_one_membership_per_user, migrations.RunPython.noop),
-        migrations.AddConstraint(
-            model_name='roomplayer',
-            constraint=models.UniqueConstraint(fields=('user',), name='unique_user_room_membership'),
-        ),
     ]

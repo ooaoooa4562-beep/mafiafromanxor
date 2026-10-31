@@ -1,12 +1,13 @@
 # Mafia from Anxor
 
-Веб-игра «Мафия»: Django backend + браузерный интерфейс.
+Онлайн-игра «Мафия»: Django backend и адаптивный браузерный интерфейс.
 
 ## Реализованная основа
 
 - `frontend/index.html` — адаптивный UI-прототип: список комнат, создание комнаты, вход по коду, игровая комната, чат-интерфейс и локальная проверка микрофона.
-- `backend/accounts/` — регистрация, вход/выход по Django session, CSRF token и профиль текущего пользователя.
+- `backend/accounts/` — регистрация, вход/выход по Django session, CSRF token и профиль пользователя.
 - `backend/rooms/` — API комнат, участники, готовность и миграции.
+- `backend/game/` — серверное назначение ролей, скрытая выдача своей роли, действия ночью, дневное голосование, таймеры фаз и определение победителя.
 - `backend/voice/` — аутентифицированный WebSocket relay для WebRTC SDP/ICE сигналинга с проверкой членства в комнате.
 - Django settings читают секреты из окружения; Redis channel layer включается через REDIS_URL.
 
@@ -24,25 +25,17 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Файл backend/.env автоматически загружается. Для локальной разработки используйте DJANGO_DEBUG=true и длинный случайный DJANGO_SECRET_KEY. Django admin доступен по /admin/.
+Файл backend/.env автоматически загружается. Для локальной разработки оставьте DJANGO_DEBUG=true и замените DJANGO_SECRET_KEY на длинную случайную строку. Django admin доступен по /admin/.
 
 ## API
 
-Все endpoints кроме CSRF, регистрации и входа требуют аутентифицированную Django session.
+Auth: GET `/api/auth/csrf/`, POST `/api/auth/register/`, POST `/api/auth/login/`, POST `/api/auth/logout/`, GET `/api/auth/me/`.
 
-Auth:
-- `GET /api/auth/csrf/` — получить CSRF token и cookie.
-- `POST /api/auth/register/` — username, nickname, password (минимум 8 символов + Django password validators).
-- `POST /api/auth/login/` — username/password.
-- `POST /api/auth/logout/` — завершить session.
-- `GET /api/auth/me/` — текущий профиль.
+Rooms: GET/POST `/api/rooms/`, GET `/api/rooms/<uuid>/`, POST `/api/rooms/<uuid>/join/`, POST `/api/rooms/<uuid>/ready/`.
 
-Rooms:
-- `GET /api/rooms/` — открытые комнаты в ожидании.
-- `POST /api/rooms/` — создать комнату (`name`, `max_players`, `is_private`). Создатель автоматически становится участником.
-- `GET /api/rooms/<uuid>/` — детали комнаты.
-- `POST /api/rooms/<uuid>/join/` — вступить в комнату.
-- `POST /api/rooms/<uuid>/ready/` — изменить готовность (`is_ready: true/false`).
+Game: POST `/api/game/<uuid>/start/`, GET `/api/game/<uuid>/state/`, POST `/api/game/<uuid>/action/`, POST `/api/game/<uuid>/advance/`.
+
+Все игровые endpoints требуют авторизованного участника комнаты. Начать игру может создатель после того, как минимум 4 игрока присоединились и все нажали «готов». Роли видит только сам игрок. Ночью доступны действия мафии/доктора/комиссара, днём — обсуждение, затем голосование. Переход фаз сейчас запускается запросом владельца комнаты после истечения таймера; для production нужен серверный scheduler/worker и широковещательные события.
 
 Для браузера используй same-origin deployment, credentials включены, а CSRF token передавай в заголовке X-CSRFToken при POST/PUT/PATCH/DELETE.
 

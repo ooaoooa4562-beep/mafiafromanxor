@@ -22,6 +22,7 @@ class RoomVoiceSignalingConsumer(AsyncJsonWebsocketConsumer):
         self.user = self.scope.get("user")
         self.room_code = self.scope["url_route"]["kwargs"]["room_code"]
         self.group_name = f"voice_{self.room_code.hex}"
+        self.joined_group = False
         if not self.user or not self.user.is_authenticated:
             await self.close(code=4401)
             return
@@ -29,13 +30,14 @@ class RoomVoiceSignalingConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4403)
             return
         await self.channel_layer.group_add(self.group_name, self.channel_name)
+        self.joined_group = True
         await self.accept()
         await self.channel_layer.group_send(self.group_name, {
             "type": "voice.presence", "event": "peer_joined", "user_id": self.user.pk,
         })
 
     async def disconnect(self, close_code):
-        if hasattr(self, "group_name") and getattr(self, "user", None) and self.user.is_authenticated:
+        if getattr(self, "joined_group", False):
             await self.channel_layer.group_send(self.group_name, {
                 "type": "voice.presence", "event": "peer_left", "user_id": self.user.pk,
             })

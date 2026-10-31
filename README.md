@@ -23,7 +23,7 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Django не загружает .env автоматически: экспортируйте переменные из файла в окружение перед запуском. Для локальной разработки используйте DJANGO_DEBUG=true и длинный случайный DJANGO_SECRET_KEY.
+Настройки автоматически загружают backend/.env. Для локальной разработки оставьте DJANGO_DEBUG=true и замените DJANGO_SECRET_KEY на длинную случайную строку. Не используйте примерный ключ в production.
 
 ## API комнат
 

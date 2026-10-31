@@ -99,6 +99,8 @@ def action(request, code):
         return JsonResponse({'error': 'authentication_required'}, status=401)
     try:
         data = json.loads(request.body or '{}')
+        if not isinstance(data, dict):
+            return JsonResponse({'error': 'invalid_request'}, status=400)
         target_id = int(data.get('target_user_id'))
         room_code = UUID(str(code))
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError, TypeError):

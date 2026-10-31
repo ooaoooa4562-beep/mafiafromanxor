@@ -96,12 +96,7 @@ def _resolve_night(match):
         match.phase_started_at = timezone.now()
         match.save(update_fields=['phase', 'phase_started_at'])
 
-    detective_result = None
-    if detective_action and detective_action.target_id:
-        target_participant = match.participants.filter(room_player_id=detective_action.target_id).first()
-        detective_result = {'is_mafia': bool(target_participant and target_participant.role == 'mafia')}
-
-    return {'eliminated': eliminated, 'protected': bool(victim and victim.pk == protected_id), 'winner': winner, 'detective_result': detective_result}
+    return {'eliminated': eliminated, 'protected': bool(victim and victim.pk == protected_id), 'winner': winner}
 
 
 def _resolve_day(match):

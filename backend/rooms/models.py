@@ -44,3 +44,17 @@ class RoomPlayer(models.Model):
 
     def __str__(self):
         return f'{self.user} in {self.room}'
+
+
+class RoomMessage(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='messages')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='room_messages')
+    content = models.CharField(max_length=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        indexes = [models.Index(fields=['room', 'created_at'], name='room_msg_room_created_idx')]
+
+    def __str__(self):
+        return f'{self.user} in {self.room}: {self.content[:40]}'

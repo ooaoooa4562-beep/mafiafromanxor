@@ -41,11 +41,27 @@ def send_request(request):
         data = json.loads(request.body or '{}')
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({'error': 'invalid_json'}, status=400)
-    username = str(data.get('username', '')).strip()
+    username = str(data.get('username', data.get('nickname', ''))).strip()
+    if not username:
+        return JsonResponse({'error': 'username_required', 'detail': 'Введи логин или игровой ник игрока.'}, status=400)
     User = get_user_model()
+    # Prefer an exact login match. If there is no login match, allow the
+    # player's public in-game nickname (case-insensitive).
     target = User.objects.filter(username__iexact=username).first()
     if target is None:
-        return JsonResponse({'error': 'user_not_found'}, status=404)
+        nickname_matches = list(
+            User.objects.filter(nickname__iexact=username)
+            .exclude(pk=request.user.pk)
+            .order_by('pk')[:2]
+        )
+        if not nickname_matches:
+            return JsonResponse({'error': 'user_not_found', 'detail': 'Игрок с таким логином или игровым ником не найден.'}, status=404)
+        if len(nickname_matches) > 1:
+            return JsonResponse({
+                'error': 'nickname_ambiguous',
+                'detail': 'Такой игровой ник используют несколько игроков. Введи их уникальный логин.',
+            }, status=409)
+        target = nickname_matches[0]
     if target.pk == request.user.pk:
         return JsonResponse({'error': 'cannot_add_self'}, status=400)
     existing = Friendship.objects.filter(

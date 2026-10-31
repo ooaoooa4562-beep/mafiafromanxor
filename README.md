@@ -9,6 +9,10 @@
 - `GET/POST /api/rooms/` — список публичных ожидающих комнат и создание комнаты (требует авторизованную Django-сессию).
 - `GET /api/auth/me/`, `POST /api/auth/register/`, `POST /api/auth/login/`, `POST /api/auth/logout/` — сессионная регистрация, вход, выход и текущий профиль. POST-запросы защищены стандартной Django CSRF-проверкой.
 - `POST /api/rooms/<uuid>/join/` — вступление в комнату (требует авторизованную Django-сессию).
+- `POST /api/game/rooms/<uuid>/start/`, `GET /api/game/rooms/<uuid>/state/`, `POST /api/game/rooms/<uuid>/action/` — запуск матча, безопасное получение личной роли и игровые действия.
+- `GET /api/game/stats/` — статистика завершённых матчей.
+- `GET /api/friends/`, `POST /api/friends/requests/`, `POST /api/friends/requests/<id>/respond/`, `POST /api/friends/<user_id>/block/` — друзья, заявки и блокировки.
+- `ws/rooms/<uuid>/` — аутентифицированный WebSocket комнаты и role-aware WebRTC signaling. WebSocket проверяет права на голосовые каналы; аудио передаётся напрямую браузерами по WebRTC.
 - Владелец автоматически добавляется в состав комнаты; повторное вступление не создаёт дубликат. Приватные комнаты не попадают в публичный список.
 - Настройки Django читают секреты и параметры окружения; Redis channel layer включается через `REDIS_URL`.
 
@@ -16,13 +20,13 @@
 
 ## Запуск интерфейса
 
-Откройте `frontend/index.html` в браузере или запустите локальный статический сервер из корня:
+Запустите Django ASGI-сервер из каталога `backend` (после установки зависимостей и настройки окружения):
 
 ```bash
-python -m http.server 8080
+python manage.py runserver
 ```
 
-Затем откройте http://localhost:8080/frontend/ . Для проверки микрофона используйте localhost или HTTPS.
+Затем откройте http://localhost:8000/ и нажмите «Играть онлайн». Для проверки микрофона используйте localhost или HTTPS. WebSocket доступен через ASGI runserver с Daphne.
 
 ## Запуск Django backend
 

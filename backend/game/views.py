@@ -23,7 +23,7 @@ def _room_state(room, user):
             'owner': room.owner.nickname or room.owner.username,
             'max_players': room.max_players,
             'players': [
-                {'id': p.user_id, 'nickname': p.user.nickname or p.user.username, 'is_ready': p.is_ready,
+                {'user_id': p.user_id, 'nickname': p.user.nickname or p.user.username, 'is_ready': p.is_ready,
                  'is_alive': p.is_alive}
                 for p in players
             ],

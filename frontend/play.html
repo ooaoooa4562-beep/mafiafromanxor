@@ -55,17 +55,23 @@ function sendSignal(type,payload){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(
 async function createPeer(id,initiate){if(peers.has(id))return peers.get(id);const stream=await ensureStream();const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});peers.set(id,pc);stream.getTracks().forEach(t=>pc.addTrack(t,stream));pc.onicecandidate=e=>{if(e.candidate)sendSignal('ice',{candidate:e.candidate.toJSON(),to:id})};pc.ontrack=e=>{let audio=document.getElementById('peer-'+id);if(!audio){audio=document.createElement('audio');audio.id='peer-'+id;audio.autoplay=true;audio.playsInline=true;$('audioPeers').append(audio)}audio.srcObject=e.streams[0]};pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)){pc.close();peers.delete(id);document.getElementById('peer-'+id)?.remove()}};if(initiate){const offer=await pc.createOffer();await pc.setLocalDescription(offer);sendSignal('offer',{description:pc.localDescription,to:id})}return pc}
 async function handleSignal(m){const id=m.from_user_id;if(m.payload?.to&&Number(m.payload.to)!==me.id)return;let pc=peers.get(id);try{if(m.signal_type==='offer'){pc=await createPeer(id,false);if(pc.signalingState!=='stable'){if(me.id<id)return;await pc.setLocalDescription({type:'rollback'})}await pc.setRemoteDescription(m.payload.description);const answer=await pc.createAnswer();await pc.setLocalDescription(answer);sendSignal('answer',{description:pc.localDescription,to:id})}else if(m.signal_type==='answer'&&pc){await pc.setRemoteDescription(m.payload.description)}else if(m.signal_type==='ice'){if(!pc)pc=await createPeer(id,false);if(m.payload.candidate)await pc.addIceCandidate(m.payload.candidate)}}catch(e){console.warn('WebRTC signaling failed',e)}}
 $('voiceJoin').onclick=async()=>{
- if(!ws||ws.readyState!==WebSocket.OPEN){$('voiceStatus').textContent='Сначала открой комнату и подключись к серверу.';return}
  $('voiceJoin').disabled=true;
  $('voiceStatus').textContent='Запрашиваем разрешение на микрофон…';
  try{
-  // Request microphone directly in the click handler, before waiting for WebSocket.
+  // Ask for microphone permission immediately from the user's click, even if signaling is reconnecting.
   await ensureStream();
-  if(!ws||ws.readyState!==WebSocket.OPEN)throw new Error('Соединение с комнатой потеряно. Переподключись к комнате.');
+  if(!ws||ws.readyState!==WebSocket.OPEN){
+   $('voiceStatus').textContent='Микрофон разрешён, но соединение с комнатой пока не готово. Обнови комнату и нажми подключить голос ещё раз.';
+   $('voiceJoin').disabled=false;
+   return;
+  }
   ws.send(JSON.stringify({type:'voice.join'}));
-  $('voiceStatus').textContent='Микрофон включён. Подключаем голосовой канал…';
+  $('voiceStatus').textContent='Микрофон разрешён. Подключаем голосовой канал…';
  }catch(error){
-  $('voiceStatus').textContent=error.message;
+  const detail=error.name==='NotAllowedError'
+   ? 'Chrome заблокировал микрофон. Нажми значок настроек сайта слева от адреса → Микрофон → Разрешить; на телефоне проверь также разрешение микрофона для Chrome в настройках Android.'
+   : error.message;
+  $('voiceStatus').textContent=detail;
   $('voiceJoin').disabled=false;
   if(localStream){localStream.getTracks().forEach(track=>track.stop());localStream=null}
  }

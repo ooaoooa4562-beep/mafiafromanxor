@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import migrations, models
+from django.db import migrations
 
 
 def keep_one_membership_per_user(apps, schema_editor):
@@ -15,6 +15,9 @@ def keep_one_membership_per_user(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # Commit duplicate cleanup before the next migration alters the table.
+    atomic = False
+
     dependencies = [
         ('rooms', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -22,8 +25,4 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(keep_one_membership_per_user, migrations.RunPython.noop),
-        migrations.AddConstraint(
-            model_name='roomplayer',
-            constraint=models.UniqueConstraint(fields=('user',), name='unique_user_room_membership'),
-        ),
     ]

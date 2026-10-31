@@ -50,7 +50,9 @@ def rooms_collection(request):
         max_players = int(data.get('max_players', 10))
     except (TypeError, ValueError):
         return JsonResponse({'error': 'invalid_max_players'}, status=400)
-    is_private = bool(data.get('is_private', True))
+    is_private = data.get('is_private', True)
+    if not isinstance(is_private, bool):
+        return JsonResponse({'error': 'invalid_is_private'}, status=400)
     if not name or len(name) > 100:
         return JsonResponse({'error': 'name_required', 'detail': 'Название должно содержать от 1 до 100 символов.'}, status=400)
     if not 4 <= max_players <= 16:

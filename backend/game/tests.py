@@ -1,7 +1,7 @@
 import json
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from rooms.models import Room, RoomPlayer
@@ -105,3 +105,10 @@ class GameApiTests(TestCase):
         match.refresh_from_db()
         self.assertEqual(match.phase, 'finished')
         self.assertEqual(match.winner, 'town')
+
+    @override_settings(GAME_NIGHT_SECONDS=0)
+    def test_expired_night_advances_when_state_is_requested(self):
+        self.client.post(reverse('game_start', kwargs={'code': self.room.code}), data='{}', content_type='application/json')
+        response = self.client.get(reverse('game_state', kwargs={'code': self.room.code}))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['game']['phase'], 'day')

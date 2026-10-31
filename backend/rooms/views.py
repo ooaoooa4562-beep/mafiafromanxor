@@ -5,7 +5,7 @@ from django.db import transaction
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .models import Room, RoomPlayer
 

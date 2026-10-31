@@ -45,6 +45,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 return
             next_group = f'voice_{self.room_code.hex}_{channel}'
             if self.voice_group and self.voice_group != next_group:
+                await self.channel_layer.group_send(self.voice_group, {'type': 'voice.presence', 'user_id': self.user_id, 'state': 'left'})
                 await self.channel_layer.group_discard(self.voice_group, self.channel_name)
             self.voice_group = next_group
             await self.channel_layer.group_add(self.voice_group, self.channel_name)

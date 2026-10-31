@@ -22,7 +22,7 @@ def _room_payload(room):
         'max_players': room.max_players,
         'players_count': len(players),
         'players': [
-            {'nickname': p.user.nickname or p.user.username, 'is_ready': p.is_ready, 'is_alive': p.is_alive}
+            {'user_id': p.user_id, 'nickname': p.user.nickname or p.user.username, 'is_ready': p.is_ready, 'is_alive': p.is_alive}
             for p in players
         ],
         'is_private': room.is_private,
@@ -44,7 +44,6 @@ def rooms_collection(request):
         data = json.loads(request.body or '{}')
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({'error': 'invalid_json'}, status=400)
-
     if not isinstance(data, dict):
         return JsonResponse({'error': 'invalid_json'}, status=400)
     name = str(data.get('name', '')).strip()
@@ -61,6 +60,9 @@ def rooms_collection(request):
         return JsonResponse({'error': 'invalid_max_players', 'detail': 'Допустимо от 4 до 16 игроков.'}, status=400)
 
     with transaction.atomic():
+        # Serialize room changes for this account and release stale memberships first.
+        type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        RoomPlayer.objects.filter(user=request.user).delete()
         room = Room.objects.create(name=name, owner=request.user, max_players=max_players, is_private=is_private)
         RoomPlayer.objects.create(room=room, user=request.user, is_ready=True)
     return JsonResponse({'room': _room_payload(room)}, status=201)
@@ -82,15 +84,36 @@ def join_room(request, code):
         return JsonResponse({'error': 'room_not_found'}, status=404)
 
     with transaction.atomic():
+        type(request.user).objects.select_for_update().get(pk=request.user.pk)
         room = Room.objects.select_for_update().filter(code=room_code).first()
         if room is None:
             return JsonResponse({'error': 'room_not_found'}, status=404)
         if room.status != 'waiting':
             return JsonResponse({'error': 'room_unavailable'}, status=409)
-        membership, created = RoomPlayer.objects.get_or_create(room=room, user=request.user)
-        if not created:
+        existing = RoomPlayer.objects.filter(room=room, user=request.user).first()
+        if existing:
             return JsonResponse({'room': _room_payload(room), 'already_joined': True})
-        if room.players.count() > room.max_players:
-            membership.delete()
-            return JsonResponse({'error': 'room_full'}, status=409)
+        if room.players.count() >= room.max_players:
+            return JsonResponse({'error': 'room_full', 'detail': 'В комнате больше нет свободных мест.'}, status=409)
+        # A player has one active room at a time. Switching rooms releases the old seat.
+        RoomPlayer.objects.filter(user=request.user).delete()
+        RoomPlayer.objects.create(room=room, user=request.user)
     return JsonResponse({'room': _room_payload(room)}, status=200)
+
+
+@require_http_methods(['POST'])
+def leave_room(request, code):
+    if _auth_required(request):
+        return JsonResponse({'error': 'authentication_required'}, status=401)
+    try:
+        room_code = UUID(str(code))
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'room_not_found'}, status=404)
+    with transaction.atomic():
+        type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        room = Room.objects.filter(code=room_code).first()
+        if room is None:
+            return JsonResponse({'error': 'room_not_found'}, status=404)
+        removed, _ = RoomPlayer.objects.filter(room=room, user=request.user).delete()
+        players_count = room.players.count()
+    return JsonResponse({'ok': True, 'removed': bool(removed), 'players_count': players_count})

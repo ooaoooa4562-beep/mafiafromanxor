@@ -35,6 +35,7 @@ if not DEBUG and SECRET_KEY == 'dev-only-change-me-before-deploying':
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -43,7 +44,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Third-party apps
-    'daphne',
     'rest_framework',
     'channels',
 

@@ -13,7 +13,7 @@ class SessionAuthApiTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 201)
-        self.assertTrue(response.json()['user']['nickname'], 'Anxor')
+        self.assertEqual(response.json()['user']['nickname'], 'Anxor')
         self.assertTrue(self.client.get(reverse('auth_me')).json()['authenticated'])
         self.assertTrue(get_user_model().objects.filter(username='new_player').exists())
 

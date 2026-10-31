@@ -15,6 +15,11 @@ def keep_one_membership_per_user(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # PostgreSQL may reject AddConstraint in the same transaction as deletes
+    # because the deletes leave pending trigger events. Commit the cleanup
+    # before changing the table schema.
+    atomic = False
+
     dependencies = [
         ('rooms', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

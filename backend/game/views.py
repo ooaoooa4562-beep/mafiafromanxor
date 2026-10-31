@@ -1,10 +1,10 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
 
 from rooms.models import Room, RoomPlayer
 from .models import Game, PlayerRole, GameAction
@@ -44,6 +44,8 @@ class GameActionView(APIView):
         actor = get_object_or_404(PlayerRole, game=game, player__user=request.user)
         if game.phase == "finished" or not actor.is_alive:
             return Response({"detail": "Ты не можешь совершить действие."}, status=status.HTTP_409_CONFLICT)
+        if game.phase_ends_at and timezone.now() >= game.phase_ends_at:
+            return Response({"detail": "Время этой фазы уже закончилось."}, status=status.HTTP_409_CONFLICT)
         action_type = request.data.get("action")
         allowed = {"night": {"mafia": "kill", "doctor": "heal", "detective": "investigate"}, "voting": {"mafia": "vote", "doctor": "vote", "detective": "vote", "civilian": "vote"}}
         expected = allowed.get(game.phase, {}).get(actor.role)

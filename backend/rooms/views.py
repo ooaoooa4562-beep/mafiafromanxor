@@ -59,6 +59,30 @@ class RoomReadyView(APIView):
     def post(self, request, code):
         room = get_object_or_404(Room, code=code, status="waiting")
         membership = get_object_or_404(RoomPlayer, room=room, user=request.user)
-        membership.is_ready = bool(request.data.get("is_ready", True))
+        value = request.data.get("is_ready", True)
+        if not isinstance(value, bool):
+            return Response({"detail": "is_ready должен быть true или false."}, status=status.HTTP_400_BAD_REQUEST)
+        membership.is_ready = value
         membership.save(update_fields=["is_ready"])
         return Response({"is_ready": membership.is_ready})
+
+
+class RoomLeaveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, code):
+        room = get_object_or_404(Room.objects.select_for_update(), code=code)
+        if room.status == "playing":
+            return Response({"detail": "Нельзя покинуть комнату во время партии."}, status=status.HTTP_409_CONFLICT)
+        membership = get_object_or_404(RoomPlayer, room=room, user=request.user)
+        if room.owner_id == request.user.id:
+            successor = RoomPlayer.objects.filter(room=room).exclude(user=request.user).select_related("user").order_by("joined_at").first()
+            if successor:
+                room.owner = successor.user
+                room.save(update_fields=["owner"])
+            else:
+                room.delete()
+                return Response({"deleted": True})
+        membership.delete()
+        return Response({"left": True})

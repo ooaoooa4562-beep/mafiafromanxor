@@ -39,6 +39,7 @@ class RoomPlayer(models.Model):
         ordering = ['joined_at']
         constraints = [
             models.UniqueConstraint(fields=['room', 'user'], name='unique_room_player'),
+            models.UniqueConstraint(fields=['user'], name='unique_user_room_membership'),
         ]
 
     def __str__(self):

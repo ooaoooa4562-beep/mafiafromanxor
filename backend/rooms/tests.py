@@ -40,6 +40,29 @@ class RoomApiTests(TestCase):
         self.assertEqual(self.client.post(url, data='{}', content_type='application/json').status_code, 200)
         self.assertEqual(RoomPlayer.objects.filter(room=room, user=guest).count(), 1)
 
+    def test_player_switching_rooms_releases_previous_seat(self):
+        first = Room.objects.create(name='First', owner=self.user, is_private=False)
+        second = Room.objects.create(name='Second', owner=self.user, is_private=False)
+        RoomPlayer.objects.create(room=first, user=self.user)
+        guest = get_user_model().objects.create_user(username='guest', password='test-pass-123')
+        self.client.force_login(guest)
+        RoomPlayer.objects.create(room=first, user=guest)
+        response = self.client.post(reverse('join_room', kwargs={'code': second.code}), data='{}', content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(RoomPlayer.objects.filter(room=first, user=guest).exists())
+        self.assertTrue(RoomPlayer.objects.filter(room=second, user=guest).exists())
+        self.assertEqual(first.players.count(), 1)
+
+    def test_leave_room_removes_player_and_updates_count(self):
+        room = Room.objects.create(name='Leave test', owner=self.user, is_private=False)
+        RoomPlayer.objects.create(room=room, user=self.user)
+        guest = get_user_model().objects.create_user(username='guest', password='test-pass-123')
+        RoomPlayer.objects.create(room=room, user=guest)
+        response = self.client.post(reverse('leave_room', kwargs={'code': room.code}), data='{}', content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(RoomPlayer.objects.filter(room=room, user=self.user).exists())
+        self.assertEqual(response.json()['players_count'], 1)
+
     def test_full_room_rejects_new_player(self):
         room = Room.objects.create(name='Small table', owner=self.user, max_players=4)
         RoomPlayer.objects.create(room=room, user=self.user)

@@ -1,5 +1,6 @@
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from uuid import UUID
 
 from game.models import GameMatch, GameParticipant
 from rooms.models import Room
@@ -12,7 +13,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4401)
             return
         self.user_id = user.pk
-        self.room_code = self.scope['url_route']['kwargs']['code']
+        self.room_code = UUID(self.scope['url_route']['kwargs']['code'])
         self.room_group = f'room_{self.room_code.hex}'
         self.voice_group = None
         if not await self.is_member(user.pk, self.room_code):

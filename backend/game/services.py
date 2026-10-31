@@ -69,7 +69,6 @@ def _resolve_night(match):
     current = match.actions.filter(round_number=match.round_number)
     mafia_actions = list(current.filter(action_type='mafia').select_related('target'))
     doctor_action = current.filter(action_type='doctor').select_related('target').first()
-    detective_action = current.filter(action_type='detective').select_related('target').first()
 
     victim = None
     if mafia_actions:

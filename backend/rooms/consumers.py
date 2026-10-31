@@ -3,7 +3,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from uuid import UUID
 
 from game.models import GameMatch, GameParticipant
-from rooms.models import Room
+from rooms.models import Room, RoomMessage
 
 
 class RoomConsumer(AsyncJsonWebsocketConsumer):
@@ -23,6 +23,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_add(self.room_group, self.channel_name)
         await self.accept()
         await self.send_json({'type': 'connected', 'room_code': str(self.room_code)})
+        await self.send_json({'type': 'chat.history', 'messages': await self.load_chat_history(self.room_code)})
 
     async def disconnect(self, close_code):
         if getattr(self, 'voice_group', None):
@@ -41,6 +42,21 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         message_type = content.get('type')
         if message_type == 'ping':
             await self.send_json({'type': 'pong'})
+            return
+        if message_type == 'chat.send':
+            message = content.get('message')
+            if not isinstance(message, str):
+                await self.send_json({'type': 'chat.error', 'detail': 'Сообщение должно быть текстом.'})
+                return
+            message = message.strip()
+            if not message or len(message) > 1000:
+                await self.send_json({'type': 'chat.error', 'detail': 'Сообщение должно содержать от 1 до 1000 символов.'})
+                return
+            saved = await self.save_chat_message(self.user_id, self.room_code, message)
+            if saved is None:
+                await self.send_json({'type': 'chat.error', 'detail': 'Ты больше не состоишь в этой комнате.'})
+                return
+            await self.channel_layer.group_send(self.room_group, {'type': 'chat.message', 'message': saved})
             return
         if message_type == 'voice.join':
             channel = await self.allowed_voice_channel(self.user_id, self.room_code)
@@ -124,6 +140,9 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.channel_layer.group_discard(old_group, self.channel_name)
                 await self.send_json({'type': 'voice.rejoin_required'})
 
+    async def chat_message(self, event):
+        await self.send_json({'type': 'chat.message', 'message': event['message']})
+
     async def voice_signal(self, event):
         if event.get('sender_channel') != self.channel_name:
             await self.send_json({
@@ -161,3 +180,33 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         if participant.role == 'mafia':
             return 'mafia'
         return None
+
+
+    @database_sync_to_async
+    def load_chat_history(self, room_code):
+        rows = RoomMessage.objects.filter(room__code=room_code).select_related('user').order_by('-created_at', '-id')[:50]
+        return [
+            {
+                'id': row.id,
+                'user_id': row.user_id,
+                'nickname': row.user.nickname or row.user.username,
+                'content': row.content,
+                'created_at': row.created_at.isoformat(),
+            }
+            for row in reversed(list(rows))
+        ]
+
+    @database_sync_to_async
+    def save_chat_message(self, user_id, room_code, content):
+        room = Room.objects.filter(code=room_code, players__user_id=user_id).first()
+        if room is None:
+            return None
+        row = RoomMessage.objects.create(room=room, user_id=user_id, content=content)
+        user = row.user
+        return {
+            'id': row.id,
+            'user_id': user_id,
+            'nickname': user.nickname or user.username,
+            'content': row.content,
+            'created_at': row.created_at.isoformat(),
+        }

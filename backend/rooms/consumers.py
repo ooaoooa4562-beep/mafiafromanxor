@@ -16,6 +16,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         self.room_code = UUID(self.scope['url_route']['kwargs']['code'])
         self.room_group = f'room_{self.room_code.hex}'
         self.voice_group = None
+        self.voice_channel = None
         if not await self.is_member(user.pk, self.room_code):
             await self.close(code=4403)
             return
@@ -48,6 +49,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.channel_layer.group_send(self.voice_group, {'type': 'voice.presence', 'user_id': self.user_id, 'state': 'left'})
                 await self.channel_layer.group_discard(self.voice_group, self.channel_name)
             self.voice_group = next_group
+            self.voice_channel = channel
             await self.channel_layer.group_add(self.voice_group, self.channel_name)
             await self.send_json({'type': 'voice.joined', 'channel': channel})
             await self.channel_layer.group_send(
@@ -63,6 +65,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 )
                 await self.channel_layer.group_discard(self.voice_group, self.channel_name)
                 self.voice_group = None
+                self.voice_channel = None
             await self.send_json({'type': 'voice.left'})
             return
         if message_type == 'voice.signal':
@@ -71,8 +74,25 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 return
             signal_type = content.get('signal_type')
             payload = content.get('payload')
+            allowed = await self.allowed_voice_channel(self.user_id, self.room_code)
+            if allowed != self.voice_channel:
+                old_group = self.voice_group
+                self.voice_group = None
+                self.voice_channel = None
+                await self.channel_layer.group_send(old_group, {'type': 'voice.presence', 'user_id': self.user_id, 'state': 'left'})
+                await self.channel_layer.group_discard(old_group, self.channel_name)
+                await self.send_json({'type': 'voice.rejoin_required'})
+                return
             if signal_type not in ('offer', 'answer', 'ice') or not isinstance(payload, dict) or len(str(payload)) > 12000:
                 await self.send_json({'type': 'error', 'detail': 'Некорректный сигнал WebRTC.'})
+                return
+            target_id = payload.get('to')
+            if not isinstance(target_id, int) or await self.allowed_voice_channel(target_id, self.room_code) != self.voice_channel:
+                await self.send_json({'type': 'error', 'detail': 'Получатель не находится в этом голосовом канале.'})
+                return
+            required_payload_key = 'candidate' if signal_type == 'ice' else 'description'
+            if not isinstance(payload.get(required_payload_key), dict):
+                await self.send_json({'type': 'error', 'detail': 'В сигнале отсутствуют данные WebRTC.'})
                 return
             await self.channel_layer.group_send(
                 self.voice_group,
@@ -96,6 +116,7 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             if expected != self.voice_group:
                 old_group = self.voice_group
                 self.voice_group = None
+                self.voice_channel = None
                 await self.channel_layer.group_send(old_group, {'type': 'voice.presence', 'user_id': self.user_id, 'state': 'left'})
                 await self.channel_layer.group_discard(old_group, self.channel_name)
                 await self.send_json({'type': 'voice.rejoin_required'})

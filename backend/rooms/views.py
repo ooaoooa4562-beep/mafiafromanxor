@@ -1,6 +1,7 @@
 import json
 from uuid import UUID
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -61,7 +62,7 @@ def rooms_collection(request):
 
     with transaction.atomic():
         # Serialize room changes for this account and release stale memberships first.
-        type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
         RoomPlayer.objects.filter(user=request.user).delete()
         room = Room.objects.create(name=name, owner=request.user, max_players=max_players, is_private=is_private)
         RoomPlayer.objects.create(room=room, user=request.user, is_ready=True)
@@ -84,7 +85,7 @@ def join_room(request, code):
         return JsonResponse({'error': 'room_not_found'}, status=404)
 
     with transaction.atomic():
-        type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
         room = Room.objects.select_for_update().filter(code=room_code).first()
         if room is None:
             return JsonResponse({'error': 'room_not_found'}, status=404)
@@ -110,7 +111,7 @@ def leave_room(request, code):
     except (ValueError, TypeError):
         return JsonResponse({'error': 'room_not_found'}, status=404)
     with transaction.atomic():
-        type(request.user).objects.select_for_update().get(pk=request.user.pk)
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
         room = Room.objects.filter(code=room_code).first()
         if room is None:
             return JsonResponse({'error': 'room_not_found'}, status=404)

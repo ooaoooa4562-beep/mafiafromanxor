@@ -1,5 +1,6 @@
 const $ = s => document.querySelector(s);
-let rooms=[],currentRoom=null,currentUser=null,currentGame=null,csrfToken=null,localStream=null,micOn=false,soundOn=true,filter="all",readyState=false,pollHandle=null,modalMode="login",chatSocket=null,voiceSocket=null;\nconst peerConnections=new Map(),pendingIce=new Map(),remoteAudio=new Map();
+let rooms=[],currentRoom=null,currentUser=null,currentGame=null,csrfToken=null,localStream=null,micOn=false,soundOn=true,filter="all",readyState=false,pollHandle=null,modalMode="login",chatSocket=null,voiceSocket=null;
+const peerConnections=new Map(),pendingIce=new Map(),remoteAudio=new Map();
 const roleNames={mafia:"Мафия",doctor:"Доктор",detective:"Комиссар",civilian:"Мирный житель"};
 const phaseNames={night:"НОЧЬ",day:"ДЕНЬ",voting:"ГОЛОСОВАНИЕ",finished:"ИГРА ЗАВЕРШЕНА"};
 async function getCsrf(){const r=await fetch("/api/auth/csrf/",{credentials:"same-origin"});csrfToken=(await r.json()).csrfToken}

@@ -1,5 +1,9 @@
 import random
 
+from datetime import timedelta
+
+from django.conf import settings
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -173,3 +177,18 @@ def submit_action(room_code, user, target_user_id):
         if actor.role == 'detective' and action_type == 'detective':
             response['investigation'] = {'is_mafia': target.role == 'mafia'}
         return response
+
+
+def advance_if_expired(room_code):
+    with transaction.atomic():
+        match = GameMatch.objects.select_for_update().select_related('room').filter(room__code=room_code).first()
+        if match is None or match.phase == 'finished':
+            return False
+        duration = settings.GAME_NIGHT_SECONDS if match.phase == 'night' else settings.GAME_DAY_SECONDS
+        if timezone.now() < match.phase_started_at + timedelta(seconds=duration):
+            return False
+        if match.phase == 'night':
+            _resolve_night(match)
+        else:
+            _resolve_day(match)
+        return True

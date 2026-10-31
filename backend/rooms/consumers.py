@@ -35,6 +35,9 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(self.room_group, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
+        if not isinstance(content, dict):
+            await self.send_json({'type': 'error', 'detail': 'Ожидается JSON-объект.'})
+            return
         message_type = content.get('type')
         if message_type == 'ping':
             await self.send_json({'type': 'pong'})

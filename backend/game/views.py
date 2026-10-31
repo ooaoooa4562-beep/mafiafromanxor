@@ -108,3 +108,43 @@ def action(request, code):
         return JsonResponse({'error': 'game_rule', 'detail': error.message}, status=error.status)
     _broadcast(room_code, 'game.updated')
     return JsonResponse(result)
+
+
+@require_GET
+def stats(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'authentication_required'}, status=401)
+    matches = list(
+        request.user.room_memberships.filter(game_participant__match__phase='finished')
+        .select_related('game_participant__match__room')
+        .order_by('-game_participant__match__finished_at')[:50]
+    )
+    played = len(matches)
+    wins = 0
+    mafia_games = 0
+    for membership in matches:
+        participant = membership.game_participant
+        match = participant.match
+        if participant.role == 'mafia':
+            mafia_games += 1
+        if (participant.role == 'mafia' and match.winner == 'mafia') or (participant.role != 'mafia' and match.winner == 'town'):
+            wins += 1
+    recent = []
+    for membership in matches[:10]:
+        participant = membership.game_participant
+        match = participant.match
+        recent.append({
+            'room': match.room.name,
+            'role': participant.role,
+            'winner': match.winner,
+            'result': 'win' if ((participant.role == 'mafia' and match.winner == 'mafia') or (participant.role != 'mafia' and match.winner == 'town')) else 'loss',
+            'finished_at': match.finished_at.isoformat() if match.finished_at else None,
+        })
+    return JsonResponse({
+        'played': played,
+        'wins': wins,
+        'losses': played - wins,
+        'win_rate': round((wins / played) * 100, 1) if played else 0,
+        'mafia_games': mafia_games,
+        'recent_matches': recent,
+    })

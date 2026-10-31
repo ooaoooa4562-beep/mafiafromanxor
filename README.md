@@ -1,34 +1,49 @@
 # Mafia from Anxor
 
-Веб-игра «Мафия» на Django с отдельным браузерным интерфейсом.
+Веб-игра «Мафия»: Django backend + браузерный интерфейс.
 
-## Текущее состояние
+## Что уже заложено
 
-- `frontend/index.html` — адаптивный интерактивный UI: список комнат, создание комнаты, вход по коду, игровая комната, чат-интерфейс, локальная проверка микрофона.
-- `backend/` — существующий Django-проект, который развивается отдельно.
-- UI сейчас работает как локальный прототип: список комнат и сообщения не синхронизируются между браузерами. Локальная проверка микрофона не является голосовым чатом.
+- `frontend/index.html` — адаптивный UI-прототип: список комнат, создание комнаты, вход по коду, игровая комната, чат-интерфейс и локальная проверка микрофона.
+- `backend/rooms/` — API комнат, участники, готовность и миграция базы данных.
+- `backend/voice/` — аутентифицированный WebSocket relay для WebRTC SDP/ICE сигналинга. Сам аудиопоток идёт через WebRTC между браузерами, а не через Django Channels.
+- Django settings читают секреты из окружения; Redis channel layer включается через REDIS_URL.
 
-## Запуск интерфейса
-
-Откройте `frontend/index.html` в браузере или запустите статический сервер из корня:
+## Запуск backend локально
 
 ```bash
-python -m http.server 8080
+cd backend
+python -m venv .venv
+# Windows: .venv\\Scripts\\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+copy .env.example .env  # Windows; на macOS/Linux: cp .env.example .env
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
 ```
 
-Затем откройте http://localhost:8080/frontend/.
+Django не загружает .env автоматически: экспортируйте переменные из файла в окружение перед запуском. Для локальной разработки используйте DJANGO_DEBUG=true и длинный случайный DJANGO_SECRET_KEY.
 
-Для доступа к микрофону браузеру нужен localhost или HTTPS.
+## API комнат
 
-## План реализации
+Все endpoints требуют аутентифицированную Django session:
+- `GET /api/rooms/` — открытые комнаты в ожидании.
+- `POST /api/rooms/` — создать комнату (`name`, `max_players`, `is_private`). Создатель автоматически становится участником.
+- `GET /api/rooms/<uuid>/` — детали комнаты.
+- `POST /api/rooms/<uuid>/join/` — вступить в комнату.
+- `POST /api/rooms/<uuid>/ready/` — изменить готовность (`is_ready: true/false`).
 
-1. API и авторизация Django REST Framework.
-2. Комнаты, присутствие игроков и события через Django Channels + Redis.
-3. Серверная машина состояний матча: роли, ночь/день, действия, голосование и таймеры.
-4. Настоящий голосовой чат через WebRTC (сигналинг через WebSocket; TURN для сложных сетей).
-5. Разделение аудиоканалов по фазам и ролям, mute/deafen и индикатор говорящего.
-6. Тесты, Docker, CI и production deployment.
+## Голосовой signaling
 
-## Важные замечания по безопасности
+`ws://localhost:8000/ws/rooms/<room-uuid>/voice/` — только для авторизованной Django session и существующей незавершённой комнаты. Сообщения offer/answer/candidate маршрутизируются целевому user_id. Это signaling foundation, не готовый voice UI: клиентская WebRTC mesh-связь, TURN/STUN и проверка членства/прав по фазам ещё требуют интеграции и тестирования.
 
-Перед публикацией/деплоем вынести Django `SECRET_KEY` в переменную окружения и заменить уже раскрытый ключ; отключить `DEBUG` в production; настроить `ALLOWED_HOSTS`, HTTPS, CORS/CSRF и Redis. Не хранить `db.sqlite3`, `__pycache__` и секреты в Git.
+Для нескольких процессов обязательно настройте Redis (`REDIS_URL=redis://...`). InMemoryChannelLayer предназначен только для локальной разработки.
+
+## Запуск UI-прототипа
+
+Из корня репозитория: `python -m http.server 8080`, затем откройте `http://localhost:8080/frontend/`. Комнаты и чат пока демонстрационные и не связаны с API.
+
+## Перед production
+
+Секретный ключ, ранее закоммиченный в истории репозитория, нужно ротировать и больше не использовать. Установить DJANGO_SECRET_KEY, DJANGO_DEBUG=false, DJANGO_ALLOWED_HOSTS, Redis, HTTPS, secure cookies, CSRF/CORS policy, TURN server, rate limits и тесты. SQLite оставить только для разработки; для production перейти на PostgreSQL.

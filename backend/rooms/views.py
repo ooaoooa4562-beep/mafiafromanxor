@@ -44,7 +44,8 @@ class RoomJoinView(APIView):
     @transaction.atomic
     def post(self, request, code):
         room = get_object_or_404(Room.objects.select_for_update(), code=code)
-        if room.status != "waiting":
+        existing = RoomPlayer.objects.filter(room=room, user=request.user).exists()
+        if not existing and room.status != "waiting":
             return Response({"detail": "Игра уже началась."}, status=status.HTTP_409_CONFLICT)
         membership, created = RoomPlayer.objects.get_or_create(room=room, user=request.user)
         if created and room.members.count() > room.max_players:

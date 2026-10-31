@@ -11,3 +11,7 @@ def notify_voice_phase_change(room_code):
             f"voice_{room_code.hex}_{channel}",
             {"type": "voice.phase_changed"},
         )
+        async_to_sync(layer.group_send)(
+            f"chat_{room_code.hex}_{channel}",
+            {"type": "chat.phase_changed"},
+        )

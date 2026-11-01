@@ -80,8 +80,9 @@ ASGI_APPLICATION = 'config.asgi.application'
 # Centrifugo secrets are configured in Render and shared with the Django service.
 CENTRIFUGO_TOKEN_SECRET = os.environ.get('CENTRIFUGO_TOKEN_SECRET', '').strip()
 CENTRIFUGO_API_KEY = os.environ.get('CENTRIFUGO_API_KEY', '').strip()
-CENTRIFUGO_API_URL = os.environ.get('CENTRIFUGO_API_URL', '').strip()
-CENTRIFUGO_PUBLIC_URL = os.environ.get('CENTRIFUGO_PUBLIC_URL', '').strip()
+CENTRIFUGO_HOSTNAME = os.environ.get('CENTRIFUGO_HOSTNAME', '').strip()
+CENTRIFUGO_API_URL = os.environ.get('CENTRIFUGO_API_URL', '').strip() or (f'https://{CENTRIFUGO_HOSTNAME}/api' if CENTRIFUGO_HOSTNAME else '')
+CENTRIFUGO_PUBLIC_URL = os.environ.get('CENTRIFUGO_PUBLIC_URL', '').strip() or (f'wss://{CENTRIFUGO_HOSTNAME}/connection/websocket' if CENTRIFUGO_HOSTNAME else '')
 
 REDIS_URL = os.environ.get('REDIS_URL')
 if REDIS_URL:

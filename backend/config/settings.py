@@ -77,6 +77,12 @@ TEMPLATES = [{
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
+# Centrifugo secrets are configured in Render and shared with the Django service.
+CENTRIFUGO_TOKEN_SECRET = os.environ.get('CENTRIFUGO_TOKEN_SECRET', '').strip()
+CENTRIFUGO_API_KEY = os.environ.get('CENTRIFUGO_API_KEY', '').strip()
+CENTRIFUGO_API_URL = os.environ.get('CENTRIFUGO_API_URL', '').strip()
+CENTRIFUGO_PUBLIC_URL = os.environ.get('CENTRIFUGO_PUBLIC_URL', '').strip()
+
 REDIS_URL = os.environ.get('REDIS_URL')
 if REDIS_URL:
     CHANNEL_LAYERS = {

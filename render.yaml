@@ -6,6 +6,12 @@ databases:
     user: mafia_anxor
 
 services:
+  - type: keyvalue
+    name: mafia-anxor-redis
+    plan: free
+    region: frankfurt
+    ipAllowList: []
+
   - type: web
     name: mafia-centrifugo
     runtime: docker
@@ -45,6 +51,11 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: mafia-anxor-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: mafia-anxor-redis
+          type: keyvalue
           property: connectionString
       - key: CENTRIFUGO_TOKEN_SECRET
         fromService:

@@ -336,17 +336,18 @@ function appendChatMessage(message){
  const empty=box.querySelector('.chat-empty');if(empty)empty.remove();
  if(message.client_message_id){const pending=box.querySelector('[data-client-message-id="'+message.client_message_id+'"]');if(pending)pending.remove()}
  if(box.querySelector('[data-message-id="'+message.id+'"]'))return;
- const item=document.createElement('article');item.className='chat-message'+(Number(message.user_id)===Number(me?.id)?' mine':'');item.dataset.messageId=message.id;
+ const item=document.createElement('article');item.className='chat-message'+(Number(message.user_id)===Number(me?.id)?' mine':'');item.dataset.messageId=message.id;item.dataset.createdAt=message.created_at||new Date().toISOString();
  const meta=document.createElement('div');meta.className='chat-meta';
  const author=document.createElement('b');author.textContent=message.nickname||'Игрок';
  const time=document.createElement('time');time.textContent=message.created_at?new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'сейчас';
  meta.append(author,time);
  const body=document.createElement('div');body.className='chat-text';body.textContent=message.content;
  item.append(meta,body);box.append(item);
- while(box.children.length>100)box.removeChild(box.firstChild);
+ const ordered=[...box.querySelectorAll('.chat-message')].sort((a,b)=>Date.parse(a.dataset.createdAt)-Date.parse(b.dataset.createdAt));ordered.forEach(node=>box.append(node));
+ while(box.querySelectorAll('.chat-message').length>100)box.querySelector('.chat-message')?.remove();
  box.scrollTop=box.scrollHeight;
 }
-function renderChatHistory(messages){$('chatMessages').innerHTML='';if(!messages.length){const empty=document.createElement('div');empty.className='chat-empty';empty.textContent='Пока сообщений нет. Начни разговор!';$('chatMessages').append(empty);return}messages.forEach(appendChatMessage)}
+function renderChatHistory(messages){const box=$('chatMessages');if(messages.length){messages.forEach(appendChatMessage);return}if(!box.querySelector('.chat-message')){const empty=document.createElement('div');empty.className='chat-empty';empty.textContent='Пока сообщений нет. Начни разговор!';box.append(empty)}}
 $('chatForm').onsubmit=async e=>{
  e.preventDefault();const message=$('chatInput').value.trim();if(!message)return;
  if(!realtimeConnected){$('chatError').textContent='Нет соединения с сервером. Подожди переподключения.';return}

@@ -14,7 +14,7 @@ from rooms.models import Room, RoomMessage
 from .centrifugo import publish
 
 
-CHANNEL_RE = re.compile(r"^\\$room-([0-9a-fA-F-]{36})-(chat|game|voice-(lobby|finished|dead|living|mafia))$")
+CHANNEL_RE = re.compile(r"^\$room-([0-9a-fA-F-]{36})-(chat|game|voice-(lobby|finished|dead|living|mafia))$")
 
 
 def _token_secret():

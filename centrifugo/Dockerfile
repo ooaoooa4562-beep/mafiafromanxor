@@ -1,6 +1,6 @@
-FROM centrifugo/centrifugo:v6
+FROM centrifugo/centrifugo:v6.10.2
 
 ENV CENTRIFUGO_HTTP_SERVER_ADDRESS=0.0.0.0
 ENV CENTRIFUGO_HTTP_SERVER_PORT=10000
 
-ENTRYPOINT ["centrifugo"]
+CMD ["centrifugo"]

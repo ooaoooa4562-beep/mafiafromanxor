@@ -13,12 +13,33 @@ services:
     ipAllowList: []
 
   - type: web
+    name: mafia-centrifugo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./centrifugo/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: CENTRIFUGO_HTTP_SERVER_ADDRESS
+        value: 0.0.0.0
+      - key: CENTRIFUGO_HTTP_SERVER_PORT
+        value: "10000"
+      - key: CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY
+        generateValue: true
+      - key: CENTRIFUGO_HTTP_API_KEY
+        generateValue: true
+      - key: CENTRIFUGO_CLIENT_ALLOWED_ORIGINS
+        value: https://mafia-from-anxor.onrender.com
+      - key: CENTRIFUGO_CHANNEL_WITHOUT_NAMESPACE_ALLOW_SUBSCRIBE_FOR_CLIENT
+        value: "true"
+
+  - type: web
     name: mafia-from-anxor
     runtime: python
     plan: free
     region: frankfurt
     buildCommand: pip install -r requirements.txt && cd backend && python manage.py collectstatic --noinput && python manage.py migrate --noinput
-    startCommand: cd backend && daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    startCommand: cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     healthCheckPath: /
     envVars:
       - key: DJANGO_SECRET_KEY
@@ -36,3 +57,18 @@ services:
           name: mafia-anxor-redis
           type: keyvalue
           property: connectionString
+      - key: CENTRIFUGO_TOKEN_SECRET
+        fromService:
+          name: mafia-centrifugo
+          type: web
+          envVarKey: CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY
+      - key: CENTRIFUGO_API_KEY
+        fromService:
+          name: mafia-centrifugo
+          type: web
+          envVarKey: CENTRIFUGO_HTTP_API_KEY
+      - key: CENTRIFUGO_HOSTNAME
+        fromService:
+          name: mafia-centrifugo
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME

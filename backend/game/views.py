@@ -4,12 +4,11 @@ from django.conf import settings
 from django.db.models import Q
 from uuid import UUID
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
 from rooms.models import Room
+from config.centrifugo import publish
 
 from .models import GameMatch
 from .services import GameRuleError, advance_if_expired, start_match, submit_action
@@ -63,9 +62,10 @@ def _room_state(room, user):
 
 
 def _broadcast(room_code, event_name='room.updated'):
-    layer = get_channel_layer()
-    if layer:
-        async_to_sync(layer.group_send)(f'room_{room_code.hex}', {'type': 'room.event', 'event': event_name})
+    publish(
+        f'$room-{room_code}-game',
+        {'type': event_name},
+    )
 
 
 @require_POST

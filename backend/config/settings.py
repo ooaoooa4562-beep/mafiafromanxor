@@ -33,7 +33,6 @@ if RENDER_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_HOSTNAME}')
 
 INSTALLED_APPS = [
-    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -41,7 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'channels',
     'accounts',
     'friends',
     'rooms',
@@ -75,28 +73,12 @@ TEMPLATES = [{
     },
 }]
 WSGI_APPLICATION = 'config.wsgi.application'
-ASGI_APPLICATION = 'config.asgi.application'
-
-REDIS_URL = os.environ.get('REDIS_URL')
-if REDIS_URL:
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                # redis-py 8 defaults socket_timeout to 5 seconds. Channels Redis
-                # uses blocking BZPOPMIN reads (5s), so the client timeout can
-                # kill otherwise healthy idle WebSockets. Keep the blocking read
-                # unbounded; connection establishment remains managed by redis-py.
-                'hosts': [{'address': REDIS_URL, 'socket_timeout': None}],
-            },
-        },
-    }
-else:
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
-        },
-    }
+# Centrifugo secrets are configured in Render and shared with the Django service.
+CENTRIFUGO_TOKEN_SECRET = os.environ.get('CENTRIFUGO_TOKEN_SECRET', '').strip()
+CENTRIFUGO_API_KEY = os.environ.get('CENTRIFUGO_API_KEY', '').strip()
+CENTRIFUGO_HOSTNAME = os.environ.get('CENTRIFUGO_HOSTNAME', '').strip()
+CENTRIFUGO_API_URL = os.environ.get('CENTRIFUGO_API_URL', '').strip() or (f'https://{CENTRIFUGO_HOSTNAME}/api' if CENTRIFUGO_HOSTNAME else '')
+CENTRIFUGO_PUBLIC_URL = os.environ.get('CENTRIFUGO_PUBLIC_URL', '').strip() or (f'wss://{CENTRIFUGO_HOSTNAME}/connection/websocket' if CENTRIFUGO_HOSTNAME else '')
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:

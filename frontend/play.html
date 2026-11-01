@@ -128,7 +128,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #e0b8
 .chat-help{margin-top:8px;color:#b49d92;font-size:12px}
 @media(max-width:560px){.room-heading{align-items:flex-start;flex-direction:column}.chat-open-btn{width:100%}.chat-panel .chat-form{flex-direction:column;align-items:stretch}.chat-panel .chat-form button{width:100%}.chat-panel .chat-form input{min-height:48px}}
 
-</style></head><body><div class="wrap"><header class="top"><div class="logo">ANXOR <span>MAFIA</span></div><div class="who"><span id="who">Гость</span><button class="btn ghost hidden" id="logout">Выйти</button><a class="btn ghost" href="/">На главную</a></div></header>
+</style><script src="https://cdn.jsdelivr.net/npm/centrifuge@5.4.0/dist/centrifuge.js"></script></head><body><div class="wrap"><header class="top"><div class="logo">ANXOR <span>MAFIA</span></div><div class="who"><span id="who">Гость</span><button class="btn ghost hidden" id="logout">Выйти</button><a class="btn ghost" href="/">На главную</a></div></header>
 <section id="auth" class="panel auth hidden"><h2>Добро пожаловать в город</h2><p class="muted">Войди или создай аккаунт, чтобы играть с друзьями.</p><div class="tabs"><button class="btn" id="tabLogin">Вход</button><button class="btn ghost" id="tabRegister">Регистрация</button></div><form id="authForm"><div class="field"><label>ЛОГИН</label><input id="username" autocomplete="username" required minlength="3"></div><div class="field hidden" id="nickWrap"><label>ИГРОВОЙ НИК</label><input id="nickname" maxlength="30"></div><div class="field"><label>ПАРОЛЬ</label><input id="password" type="password" autocomplete="current-password" required minlength="8"></div><button class="btn" style="width:100%" id="authSubmit">Войти</button></form><div class="error" id="authError"></div></section>
 <section id="gameApp" class="hidden"><div class="layout"><main class="panel"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><h2 id="mainTitle">Открытые комнаты</h2><div class="muted" id="mainSub">Найди компанию или создай собственный стол.</div></div><span class="tag" id="connection">● ONLINE</span></div>
 <div id="lobby"><div class="actions"><button class="btn" id="createRoom">＋ Создать комнату</button><button class="btn ghost" id="refreshRooms">Обновить список</button></div><div class="field"><label>ВОЙТИ ПО КОДУ ПРИГЛАШЕНИЯ</label><div style="display:flex;gap:8px"><input id="inviteCode" placeholder="UUID комнаты" style="flex:1"><button class="btn ghost" id="joinCode">Войти</button></div></div><div class="roomlist" id="rooms"></div></div>
@@ -136,7 +136,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #e0b8
 <section class="status chat-panel hidden" id="roomChat"><div class="chat-head"><div><strong>💬 Чат комнаты</strong><div class="small">Пиши сообщения игрокам за этим столом</div></div><span class="small" id="chatStatus">Подключение…</span></div><div class="chat-messages" id="chatMessages" aria-live="polite"><div class="chat-empty">Сообщения появятся здесь. Поздоровайся с игроками!</div></div><form class="chat-form" id="chatForm"><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Напиши сообщение здесь…" aria-label="Сообщение в чат"><button class="btn" id="chatSend" type="submit">Отправить</button></form><div class="chat-help">Нажми Enter или кнопку «Отправить», чтобы написать сообщение.</div><div class="small" id="chatError" role="status"></div></section><div class="status"><strong>Голосовая связь</strong><div class="muted" id="voiceStatus">Голосовой канал ещё не подключён.</div><div class="voice"><button class="btn" id="voiceJoin">🎙 Подключить микрофон</button><button class="btn ghost" id="voiceMute" disabled>Выключить микрофон</button><button class="btn ghost" id="voiceLeave" disabled>Отключить голос</button></div><div class="small">Голосовые каналы ограничиваются ролью и фазой партии. Нужен HTTPS или localhost.</div><div id="audioPeers"></div></div></div></main>
 <aside class="panel"><h2>Твоя статистика</h2><div id="stats" class="notice">Загружаем статистику…</div><div style="height:18px"></div><h2>Друзья</h2><p class="muted">Добавляй игроков по логину и принимай приглашения.</p><div class="field"><label>ЛОГИН ИЛИ ИГРОВОЙ НИК</label><div style="display:flex;gap:7px"><input id="friendName" placeholder="Логин или ник игрока" style="min-width:0;flex:1"><button class="btn ghost" id="addFriend">＋</button></div></div><div class="error" id="friendError"></div><div id="friendList" class="muted">Загрузка списка друзей…</div><div class="notice">Подсказка: поделись UUID комнаты с друзьями, чтобы они могли присоединиться.</div></aside></div></section></div>
 <script>
-const $=id=>document.getElementById(id);let authMode='login',me=null,roomCode=null,roomState=null,ws=null,localStream=null,voiceJoined=false,muted=false;const peers=new Map(),pendingIce=new Map();let iceServersPromise=null;
+const $=id=>document.getElementById(id);let authMode='login',me=null,roomCode=null,roomState=null,centrifuge=null,localStream=null,voiceJoined=false,muted=false,realtimeConnected=false,voiceChannel=null;const realtimeSubs=new Map(),peers=new Map(),pendingIce=new Map();let iceServersPromise=null;
 async function getIceServers(){if(!iceServersPromise)iceServersPromise=api('/api/voice/ice-servers/').then(data=>data.ice_servers).catch(()=>[{urls:'stun:stun.l.google.com:19302'}]);return iceServersPromise}
 function cookie(name){return document.cookie.split('; ').find(v=>v.startsWith(name+'='))?.split('=').slice(1).join('=')||''}
 async function api(path,method='GET',body){const headers={};if(body!==undefined)headers['Content-Type']='application/json';if(!['GET','HEAD'].includes(method))headers['X-CSRFToken']=decodeURIComponent(cookie('csrftoken'));const r=await fetch(path,{method,headers,credentials:'same-origin',body:body===undefined?undefined:JSON.stringify(body)});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.detail||data.error||('HTTP '+r.status));return data}
@@ -153,7 +153,7 @@ $('refreshRooms').onclick=loadRooms;
 $('createRoom').onclick=async()=>{const name=prompt('Название комнаты','Ночной город');if(!name)return;try{const d=await api('/api/rooms/','POST',{name,max_players:10,is_private:false});await openRoom(d.room.code)}catch(e){alert(e.message)}};
 async function joinRoom(code){try{await api('/api/rooms/'+code+'/join/','POST',{});await openRoom(code)}catch(e){alert(e.message)}}
 $('joinCode').onclick=()=>{const code=$('inviteCode').value.trim();if(code)joinRoom(code)};
-async function openRoom(code){roomCode=code;localStorage.setItem('mafia.activeRoom',code);$('lobby').classList.add('hidden');$('roomView').classList.remove('hidden');$('mainTitle').textContent='Игровая комната';$('mainSub').textContent='Играй честно. Доверяй осторожно.';await loadState();connectSocket()}
+async function openRoom(code){roomCode=code;localStorage.setItem('mafia.activeRoom',code);$('lobby').classList.add('hidden');$('roomView').classList.remove('hidden');$('mainTitle').textContent='Игровая комната';$('mainSub').textContent='Играй честно. Доверяй осторожно.';await loadState();connectRealtime().catch(e=>{$('chatStatus').textContent='Нет соединения';$('chatError').textContent=e.message})}
 async function loadState(){try{roomState=await api('/api/game/rooms/'+roomCode+'/state/');renderState()}catch(e){try{const r=await api('/api/rooms/');const found=r.rooms.find(x=>x.code===roomCode);if(found){$('roomName').textContent=found.name;$('roomCode').textContent=roomCode;$('roomCount').textContent=found.players_count+' / '+found.max_players+' игроков'}else throw e}catch(err){showError('gameError',e.message)}}}
 function renderState(){const r=roomState.room;$('roomName').textContent=r.name;$('roomCode').textContent=r.code;$('roomCount').textContent=r.players.length+' / '+r.max_players+' игроков';$('players').innerHTML='';r.players.forEach(p=>{const el=document.createElement('div');el.className='player';const name=document.createElement('span');name.textContent=p.nickname+(p.user_id===me.id?' · ты':'');const status=document.createElement('span');status.className=p.is_alive?'alive':'dead';status.textContent=p.is_alive?'● В игре':'● Выбыл';el.append(name,status);$('players').append(el)});$('startGame').classList.toggle('hidden',r.owner!==me.nickname&&r.owner!==me.username||!!roomState.game);$('gameArea').classList.toggle('hidden',!roomState.game);if(roomState.game)renderGame(roomState.game)}
 function renderGame(g){$('phase').textContent=(g.phase==='night'?'НОЧЬ':g.phase==='day'?'ДЕНЬ':'ИГРА ЗАВЕРШЕНА')+' · РАУНД '+g.round;$('myRole').textContent=({mafia:'Мафия',doctor:'Доктор',detective:'Комиссар',citizen:'Мирный житель'})[g.my_role]||'Наблюдатель';$('gameTitle').textContent=g.winner?(g.winner==='mafia'?'Победила мафия':'Победили мирные'):'Твоя роль';$('gameInfo').textContent=g.winner?'Партия завершена':g.phase==='night'?'Город спит. Особые роли совершают ночные действия.':'Город проснулся. Обсудите события и проголосуйте.';$('targets').innerHTML='';let canAct=g.phase==='day'||(g.phase==='night'&&['mafia','doctor','detective'].includes(g.my_role));$('actionHint').textContent=g.phase==='night'?({mafia:'Мафия: выбери игрока для устранения.',doctor:'Доктор: выбери игрока, которого защитишь.',detective:'Комиссар: выбери игрока для проверки.',citizen:'Ты мирный житель. Ночью твоего действия нет.'})[g.my_role]:'Выбери игрока, за которого голосуешь.';if(canAct&&!g.winner){g.participants.filter(p=>p.is_alive&&p.user_id!==me.id||p.is_alive&&g.my_role==='doctor'&&g.phase==='night').forEach(p=>{const b=document.createElement('button');b.className='btn ghost';b.style.margin='5px';b.textContent=p.nickname;b.onclick=()=>sendAction(p.user_id);$('targets').append(b)})}updateTimer();if(g.winner){g.participants.forEach(p=>{const row=document.createElement('div');row.className='player';row.textContent=p.nickname+' — '+({mafia:'Мафия',doctor:'Доктор',detective:'Комиссар',citizen:'Мирный'})[p.role];$('targets').append(row)})}}
@@ -161,66 +161,72 @@ $('startGame').onclick=async()=>{try{await api('/api/game/rooms/'+roomCode+'/sta
 function updateTimer(){const game=roomState?.game;if(!game||!game.phase_ends_at){$('phaseTimer').textContent='';return}const seconds=Math.max(0,Math.ceil((Date.parse(game.phase_ends_at)-Date.now())/1000));$('phaseTimer').textContent='До конца фазы: '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')}
 async function sendAction(id){try{const d=await api('/api/game/rooms/'+roomCode+'/action/','POST',{target_user_id:id});showError('gameError',d.investigation?('Проверка: '+(d.investigation.is_mafia?'подозреваемый — мафия':'подозреваемый не мафия')):'Ход принят.');await loadState()}catch(e){showError('gameError',e.message)}}
 $('copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(roomCode);$('copyCode').textContent='Скопировано ✓'}catch(e){prompt('Скопируй код комнаты',roomCode)}};
-$('leaveRoom').onclick=async()=>{const leaving=roomCode;if(!leaving)return;voiceLeave();$('leaveRoom').disabled=true;try{await api('/api/rooms/'+leaving+'/leave/','POST',{});if(ws){ws.close();ws=null}localStorage.removeItem('mafia.activeRoom');roomCode=null;roomState=null;$('roomView').classList.add('hidden');$('lobby').classList.remove('hidden');$('mainTitle').textContent='Открытые комнаты';$('mainSub').textContent='Найди компанию или создай собственный стол.';showError('gameError','');await loadRooms()}catch(e){showError('gameError','Не удалось выйти из комнаты: '+e.message)}finally{$('leaveRoom').disabled=false}};
-let reconnectTimer=null,reconnectAttempts=0;
-function connectSocket(){
- if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null}
- if(ws){const previous=ws;ws=null;previous.onclose=null;try{previous.close()}catch(e){}}
- if(!roomCode)return;
- const socketRoom=roomCode;
- const scheme=location.protocol==='https:'?'wss:':'ws:';
- let socket;
- try{socket=new WebSocket(scheme+'//'+location.host+'/ws/rooms/'+socketRoom+'/')}catch(error){scheduleSocketReconnect(socketRoom);return}
- ws=socket;
- socket.onopen=()=>{
-  if(ws!==socket||roomCode!==socketRoom){socket.close();return}
-  reconnectAttempts=0;
-  $('connection').textContent='● НА СВЯЗИ';$('connection').style.color='var(--green)';
-  $('chatStatus').textContent='В сети';$('chatInput').disabled=false;$('chatSend').disabled=false;
-  $('chatError').textContent='';
- };
- socket.onerror=()=>{if(ws===socket)$('chatStatus').textContent='Пробуем восстановить связь…'};
- socket.onclose=event=>{
-  if(ws!==socket)return;
-  ws=null;
-  $('connection').textContent='● НЕТ СВЯЗИ';$('connection').style.color='var(--red)';
-  $('chatInput').disabled=true;$('chatSend').disabled=true;
-  if(event.code===4401){
-   $('chatStatus').textContent='Сессия истекла';$('chatError').textContent='Войди в аккаунт заново, чтобы пользоваться чатом.';
-   return;
-  }
-  if(event.code===4403){
-   $('chatStatus').textContent='Нет доступа к комнате';$('chatError').textContent='Похоже, ты больше не состоишь в этой комнате. Выйди и зайди снова.';
-   return;
-  }
-  $('chatStatus').textContent='Соединение потеряно · переподключаемся…';
-  scheduleSocketReconnect(socketRoom);
- };
- socket.onmessage=async e=>{
-  if(ws!==socket)return;
-  let m;try{m=JSON.parse(e.data)}catch(error){return}
-  if(m.type==='connected'){$('chatStatus').textContent='В сети'}
-  if(m.type==='game.started'||m.type==='game.updated'||m.type==='room.updated')await loadState();
-  if(m.type==='chat.history'){renderChatHistory(m.messages||[])}
-  if(m.type==='chat.message'){appendChatMessage(m.message)}
-  if(m.type==='chat.error')$('chatError').textContent=m.detail||'Не удалось отправить сообщение.';
-  if(m.type==='voice.joined'){voiceJoined=true;$('voiceStatus').textContent='Голос активен · '+m.channel;$('voiceMute').disabled=false;$('voiceLeave').disabled=false;$('voiceJoin').disabled=true}
-  if(m.type==='voice.presence'&&m.state==='joined'&&Number(me.id)<Number(m.user_id))createPeer(m.user_id,true).catch(err=>{$('voiceStatus').textContent='Не удалось подключить собеседника: '+err.message});
-  if(m.type==='voice.presence'&&m.state==='left'){const peer=peers.get(m.user_id);if(peer){peer.close();peers.delete(m.user_id)}document.getElementById('peer-'+m.user_id)?.remove()}
-  if(m.type==='voice.signal')handleSignal(m);
-  if(m.type==='voice.denied'||m.type==='voice.rejoin_required'){$('voiceStatus').textContent=m.detail||'Фаза игры изменилась. Переподключи голос.';voiceLeave(false)}
-  if(m.type==='voice.left')$('voiceStatus').textContent='Голос отключён.';
- };
+$('leaveRoom').onclick=async()=>{const leaving=roomCode;if(!leaving)return;$('leaveRoom').disabled=true;try{await voiceLeave();await api('/api/rooms/'+leaving+'/leave/','POST',{});disconnectRealtime();localStorage.removeItem('mafia.activeRoom');roomCode=null;roomState=null;$('roomView').classList.add('hidden');$('lobby').classList.remove('hidden');$('mainTitle').textContent='Открытые комнаты';$('mainSub').textContent='Найди компанию или создай собственный стол.';showError('gameError','');await loadRooms()}catch(e){showError('gameError','Не удалось выйти из комнаты: '+e.message)}finally{$('leaveRoom').disabled=false}};
+function roomChannel(kind){return '$room-'+roomCode+'-'+kind}
+async function subscribeRealtimeChannel(channel){
+ if(!centrifuge||realtimeSubs.has(channel))return realtimeSubs.get(channel)||null;
+ const sub=centrifuge.newSubscription(channel,{
+  getToken:async ctx=>(await api('/api/realtime/subscription-token/?channel='+encodeURIComponent(ctx.channel))).token
+ });
+ sub.on('publication',ctx=>handleRealtime(ctx.data));
+ sub.on('subscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=false;$('chatSend').disabled=false}});
+ sub.on('unsubscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=true;$('chatSend').disabled=true}});
+ sub.on('error',ctx=>console.warn('Centrifugo subscription error',ctx));
+ realtimeSubs.set(channel,sub);sub.subscribe();return sub;
 }
-function scheduleSocketReconnect(expectedRoom){
- if(reconnectTimer||!roomCode||roomCode!==expectedRoom)return;
- const delay=Math.min(15000,1000*Math.pow(2,Math.min(reconnectAttempts,4)));
- reconnectAttempts++;
- $('chatStatus').textContent='Переподключение через '+Math.ceil(delay/1000)+' сек…';
- reconnectTimer=setTimeout(()=>{
-  reconnectTimer=null;
-  if(roomCode===expectedRoom)connectSocket();
- },delay);
+async function connectRealtime(){
+ disconnectRealtime();
+ if(!roomCode)return;
+ if(typeof window.Centrifuge!=='function')throw new Error('Не удалось загрузить Centrifugo SDK. Обнови страницу.');
+ const cfg=await api('/api/realtime/connection-token/');
+ if(!cfg.url)throw new Error('Centrifugo ещё не настроен на сервере Render.');
+ const socketRoom=roomCode;
+ centrifuge=new window.Centrifuge(cfg.url,{
+  token:cfg.token,
+  getToken:async()=>(await api('/api/realtime/connection-token/')).token
+ });
+ centrifuge.on('connected',()=>{
+  if(roomCode!==socketRoom)return;
+  realtimeConnected=true;$('connection').textContent='● НА СВЯЗИ';$('connection').style.color='var(--green)';
+  $('chatStatus').textContent='В сети';$('chatInput').disabled=false;$('chatSend').disabled=false;$('chatError').textContent='';
+ });
+ centrifuge.on('connecting',()=>{
+  if(roomCode===socketRoom){realtimeConnected=false;$('chatStatus').textContent='Подключаемся…';}
+ });
+ centrifuge.on('disconnected',ctx=>{
+  if(roomCode!==socketRoom)return;
+  realtimeConnected=false;$('connection').textContent='● НЕТ СВЯЗИ';$('connection').style.color='var(--red)';
+  $('chatInput').disabled=true;$('chatSend').disabled=true;
+  $('chatStatus').textContent='Связь потеряна · переподключаемся…';
+  console.warn('Centrifugo disconnected',ctx);
+ });
+ await subscribeRealtimeChannel(roomChannel('chat'));
+ await subscribeRealtimeChannel(roomChannel('game'));
+ centrifuge.connect();
+ try{const history=await api('/api/realtime/rooms/'+socketRoom+'/messages/history/');renderChatHistory(history.messages||[])}catch(e){$('chatError').textContent=e.message}
+}
+function disconnectRealtime(){
+ realtimeConnected=false;
+ for(const sub of realtimeSubs.values()){try{sub.unsubscribe()}catch(e){}}
+ realtimeSubs.clear();
+ if(centrifuge){try{centrifuge.disconnect()}catch(e){}centrifuge=null}
+ $('chatInput').disabled=true;$('chatSend').disabled=true;
+}
+function handleRealtime(m){
+ if(!m||typeof m!=='object')return;
+ if(m.type==='game.started'||m.type==='game.updated'){
+  const previousPhase=roomState?.game?.phase;
+  loadState().then(()=>{if(voiceJoined&&previousPhase!==roomState?.game?.phase){voiceLeave();$('voiceStatus').textContent='Фаза игры изменилась. Подключи голос заново.'}});
+ }
+ if(m.type==='room.updated')loadState();
+ if(m.type==='chat.message')appendChatMessage(m.message);
+ if(m.type==='voice.presence'&&Number(m.user_id)!==Number(me.id)&&m.state==='joined'&&Number(me.id)<Number(m.user_id))
+  createPeer(m.user_id,true).catch(err=>{$('voiceStatus').textContent='Не удалось подключить собеседника: '+err.message});
+ if(m.type==='voice.presence'&&Number(m.user_id)!==Number(me.id)&&m.state==='left'){
+  const peer=peers.get(Number(m.user_id));if(peer){peer.close();peers.delete(Number(m.user_id))}
+  document.getElementById('peer-'+m.user_id)?.remove();
+ }
+ if(m.type==='voice.signal')handleSignal(m);
 }
 async function ensureStream(){
  if(localStream&&localStream.getAudioTracks().some(track=>track.readyState==='live'))return localStream;
@@ -238,7 +244,7 @@ async function ensureStream(){
   throw new Error(messages[error.name]||('Не удалось открыть микрофон: '+(error.message||error.name)));
  }
 }
-function sendSignal(type,payload){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'voice.signal',signal_type:type,payload}))}
+function sendSignal(type,payload){if(!roomCode)return;api('/api/realtime/rooms/'+roomCode+'/voice/signal/','POST',{signal_type:type,payload}).catch(e=>console.warn('WebRTC signaling failed',e))}
 async function createPeer(id,initiate){
  id=Number(id);if(peers.has(id))return peers.get(id);
  const stream=await ensureStream();
@@ -285,23 +291,30 @@ async function handleSignal(m){
  }catch(e){console.warn('WebRTC signaling failed',e);$('voiceStatus').textContent='Ошибка голосового соединения: '+e.message}
 }
 $('voiceJoin').onclick=async()=>{
- if(!ws||ws.readyState!==WebSocket.OPEN){$('voiceStatus').textContent='Сначала открой комнату и подключись к серверу.';return}
- $('voiceJoin').disabled=true;
- $('voiceStatus').textContent='Запрашиваем разрешение на микрофон…';
+ if(!realtimeConnected){$('voiceStatus').textContent='Сначала подключись к realtime-серверу.';return}
+ $('voiceJoin').disabled=true;$('voiceStatus').textContent='Запрашиваем разрешение на микрофон…';
  try{
-  // Request microphone directly in the click handler, before waiting for WebSocket.
   await ensureStream();
-  if(!ws||ws.readyState!==WebSocket.OPEN)throw new Error('Соединение с комнатой потеряно. Переподключись к комнате.');
-  ws.send(JSON.stringify({type:'voice.join'}));
-  $('voiceStatus').textContent='Микрофон включён. Подключаем голосовой канал…';
+  const joined=await api('/api/realtime/rooms/'+roomCode+'/voice/join/','POST',{});
+  voiceChannel=joined.channel;
+  await subscribeRealtimeChannel(roomChannel('voice-'+voiceChannel));
+  voiceJoined=true;$('voiceStatus').textContent='Голос активен · '+voiceChannel;
+  $('voiceMute').disabled=false;$('voiceLeave').disabled=false;$('voiceJoin').disabled=true;
  }catch(error){
-  $('voiceStatus').textContent=error.message;
-  $('voiceJoin').disabled=false;
+  $('voiceStatus').textContent=error.message;$('voiceJoin').disabled=false;
   if(localStream){localStream.getTracks().forEach(track=>track.stop());localStream=null}
  }
 };
 $('voiceMute').onclick=()=>{if(!localStream)return;muted=!muted;localStream.getAudioTracks().forEach(t=>t.enabled=!muted);$('voiceMute').textContent=muted?'Включить микрофон':'Выключить микрофон'};
-function voiceLeave(send=true){if(send&&ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'voice.leave'}));voiceJoined=false;peers.forEach(pc=>pc.close());peers.clear();pendingIce.clear();$('audioPeers').innerHTML='';if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}muted=false;$('voiceMute').disabled=true;$('voiceLeave').disabled=true;$('voiceJoin').disabled=false;$('voiceMute').textContent='Выключить микрофон';$('voiceStatus').textContent='Голос отключён.'}
+async function voiceLeave(){
+ if(voiceChannel&&roomCode){try{await api('/api/realtime/rooms/'+roomCode+'/voice/leave/','POST',{channel:voiceChannel})}catch(e){console.warn('Voice leave failed',e)}}
+ const channel=voiceChannel?roomChannel('voice-'+voiceChannel):null;
+ if(channel&&realtimeSubs.has(channel)){const sub=realtimeSubs.get(channel);sub.unsubscribe();realtimeSubs.delete(channel)}
+ voiceChannel=null;voiceJoined=false;peers.forEach(pc=>pc.close());peers.clear();pendingIce.clear();$('audioPeers').innerHTML='';
+ if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
+ muted=false;$('voiceMute').disabled=true;$('voiceLeave').disabled=true;$('voiceJoin').disabled=false;
+ $('voiceMute').textContent='Выключить микрофон';$('voiceStatus').textContent='Голос отключён.';
+}
 $('voiceLeave').onclick=()=>voiceLeave();
 
 
@@ -313,7 +326,7 @@ $('chatToggle').onclick=()=>{
  $('chatToggle').textContent=opening?'✕ Закрыть чат':'💬 Открыть чат';
  if(opening){
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
-  if(ws&&ws.readyState===WebSocket.OPEN){$('chatInput').disabled=false;$('chatSend').disabled=false}
+  if(realtimeConnected){$('chatInput').disabled=false;$('chatSend').disabled=false}
   window.setTimeout(()=>$('chatInput').focus({preventScroll:true}),180);
  }
 };
@@ -323,22 +336,27 @@ function appendChatMessage(message){
  const empty=box.querySelector('.chat-empty');if(empty)empty.remove();
  if(message.client_message_id){const pending=box.querySelector('[data-client-message-id="'+message.client_message_id+'"]');if(pending)pending.remove()}
  if(box.querySelector('[data-message-id="'+message.id+'"]'))return;
- const item=document.createElement('article');item.className='chat-message'+(Number(message.user_id)===Number(me?.id)?' mine':'');item.dataset.messageId=message.id;
+ const item=document.createElement('article');item.className='chat-message'+(Number(message.user_id)===Number(me?.id)?' mine':'');item.dataset.messageId=message.id;item.dataset.createdAt=message.created_at||new Date().toISOString();
  const meta=document.createElement('div');meta.className='chat-meta';
  const author=document.createElement('b');author.textContent=message.nickname||'Игрок';
  const time=document.createElement('time');time.textContent=message.created_at?new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'сейчас';
  meta.append(author,time);
  const body=document.createElement('div');body.className='chat-text';body.textContent=message.content;
  item.append(meta,body);box.append(item);
- while(box.children.length>100)box.removeChild(box.firstChild);
+ const ordered=[...box.querySelectorAll('.chat-message')].sort((a,b)=>Date.parse(a.dataset.createdAt)-Date.parse(b.dataset.createdAt));ordered.forEach(node=>box.append(node));
+ while(box.querySelectorAll('.chat-message').length>100)box.querySelector('.chat-message')?.remove();
  box.scrollTop=box.scrollHeight;
 }
-function renderChatHistory(messages){$('chatMessages').innerHTML='';if(!messages.length){const empty=document.createElement('div');empty.className='chat-empty';empty.textContent='Пока сообщений нет. Начни разговор!';$('chatMessages').append(empty);return}messages.forEach(appendChatMessage)}
-$('chatForm').onsubmit=e=>{
- e.preventDefault();const message=$('chatInput').value.trim();
- if(!message)return;
- if(!ws||ws.readyState!==WebSocket.OPEN){$('chatError').textContent='Нет соединения с комнатой. Подожди переподключения.';return}
- const clientMessageId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'msg-'+Date.now()+'-'+Math.random().toString(36).slice(2);const pending={id:'pending-'+clientMessageId,user_id:me.id,nickname:me.nickname||me.username,content:message,created_at:new Date().toISOString()};appendChatMessage(pending);const pendingEl=$('chatMessages').querySelector('[data-message-id="'+pending.id+'"]');if(pendingEl)pendingEl.dataset.clientMessageId=clientMessageId;ws.send(JSON.stringify({type:'chat.send',message,client_message_id:clientMessageId}));window.setTimeout(()=>{const el=$('chatMessages').querySelector('[data-client-message-id="'+clientMessageId+'"]');if(el){el.remove();$('chatError').textContent='Сообщение не подтвердилось сервером. Проверь соединение и отправь ещё раз.'}},15000);$('chatInput').value='';$('chatError').textContent='';
+function renderChatHistory(messages){const box=$('chatMessages');if(messages.length){messages.forEach(appendChatMessage);return}if(!box.querySelector('.chat-message')){const empty=document.createElement('div');empty.className='chat-empty';empty.textContent='Пока сообщений нет. Начни разговор!';box.append(empty)}}
+$('chatForm').onsubmit=async e=>{
+ e.preventDefault();const message=$('chatInput').value.trim();if(!message)return;
+ if(!realtimeConnected){$('chatError').textContent='Нет соединения с сервером. Подожди переподключения.';return}
+ $('chatSend').disabled=true;
+ try{
+  const result=await api('/api/realtime/rooms/'+roomCode+'/messages/','POST',{message});
+  appendChatMessage(result.message);$('chatInput').value='';$('chatError').textContent='';
+ }catch(error){$('chatError').textContent=error.message}
+ finally{$('chatSend').disabled=!realtimeConnected}
 };
 
 async function loadStats(){try{const d=await api('/api/game/stats/');$('stats').textContent='Сыграно: '+d.played+' · Побед: '+d.wins+' · Поражений: '+d.losses+' · Побед: '+d.win_rate+'%'}catch(e){$('stats').textContent=e.message}}

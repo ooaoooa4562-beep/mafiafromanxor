@@ -56,7 +56,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             if saved is None:
                 await self.send_json({'type': 'chat.error', 'detail': 'Ты больше не состоишь в этой комнате.'})
                 return
-            await self.channel_layer.group_send(self.room_group, {'type': 'chat.message', 'message': saved})
+            client_message_id = content.get('client_message_id')
+            if not isinstance(client_message_id, str) or len(client_message_id) > 80:
+                client_message_id = None
+            await self.channel_layer.group_send(self.room_group, {'type': 'chat.message', 'message': saved, 'client_message_id': client_message_id})
             return
         if message_type == 'voice.join':
             channel = await self.allowed_voice_channel(self.user_id, self.room_code)
@@ -141,7 +144,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.send_json({'type': 'voice.rejoin_required'})
 
     async def chat_message(self, event):
-        await self.send_json({'type': 'chat.message', 'message': event['message']})
+        message = dict(event['message'])
+        if event.get('client_message_id'):
+            message['client_message_id'] = event['client_message_id']
+        await self.send_json({'type': 'chat.message', 'message': message})
 
     async def voice_signal(self, event):
         if event.get('sender_channel') != self.channel_name:

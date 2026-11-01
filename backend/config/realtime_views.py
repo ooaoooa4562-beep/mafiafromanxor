@@ -11,7 +11,7 @@ from game.models import GameMatch, GameParticipant
 from rooms.models import Room
 
 
-CHANNEL_RE = re.compile(r"^\\$room:([0-9a-fA-F-]{36}):(chat|game|voice:(lobby|finished|dead|living|mafia))$")
+CHANNEL_RE = re.compile(r"^\\$room-([0-9a-fA-F-]{36})-(chat|game|voice-(lobby|finished|dead|living|mafia))$")
 
 
 def _token_secret():
@@ -60,8 +60,8 @@ def subscription_token(request):
         return JsonResponse({"detail": "permission_denied"}, status=403)
 
     channel_kind = match.group(2)
-    if channel_kind.startswith("voice:"):
-        requested_voice_channel = channel_kind.split(":", 1)[1]
+    if channel_kind.startswith("voice-"):
+        requested_voice_channel = channel_kind.split("-", 1)[1]
         game = GameMatch.objects.filter(room=room).first()
         if game is None:
             allowed_voice_channel = "lobby"

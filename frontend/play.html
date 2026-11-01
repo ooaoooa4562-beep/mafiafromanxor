@@ -123,7 +123,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #e0b8
 .chat-panel .chat-form input{display:block;flex:1;min-width:0;width:100%;height:48px;padding:0 15px;font:inherit;font-size:15px;line-height:1.4;border:1px solid #8a5b50;border-radius:12px;background:#0d0909;color:#fff0e3;outline:none}
 .chat-panel .chat-form input::placeholder{color:#a58d81}
 .chat-panel .chat-form input:focus{border-color:#d4ad72;box-shadow:0 0 0 4px #d4ad7220}
-.chat-panel .chat-form input:disabled{opacity:.55;cursor:not-allowed}
+.chat-panel .chat-form input:disabled{opacity:.75;cursor:text}
 .chat-panel .chat-form button{min-height:48px;white-space:nowrap}
 .chat-help{margin-top:8px;color:#b49d92;font-size:12px}
 @media(max-width:560px){.room-heading{align-items:flex-start;flex-direction:column}.chat-open-btn{width:100%}.chat-panel .chat-form{flex-direction:column;align-items:stretch}.chat-panel .chat-form button{width:100%}.chat-panel .chat-form input{min-height:48px}}
@@ -170,7 +170,7 @@ async function subscribeRealtimeChannel(channel){
  });
  sub.on('publication',ctx=>handleRealtime(ctx.data));
  sub.on('subscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=false;$('chatSend').disabled=false}});
- sub.on('unsubscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=true;$('chatSend').disabled=true}});
+ sub.on('unsubscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=false;$('chatSend').disabled=true}});
  sub.on('error',ctx=>console.warn('Centrifugo subscription error',ctx));
  realtimeSubs.set(channel,sub);sub.subscribe();return sub;
 }
@@ -196,7 +196,7 @@ async function connectRealtime(){
  centrifuge.on('disconnected',ctx=>{
   if(roomCode!==socketRoom)return;
   realtimeConnected=false;$('connection').textContent='● НЕТ СВЯЗИ';$('connection').style.color='var(--red)';
-  $('chatInput').disabled=true;$('chatSend').disabled=true;
+  $('chatInput').disabled=false;$('chatSend').disabled=true;
   $('chatStatus').textContent='Связь потеряна · переподключаемся…';
   console.warn('Centrifugo disconnected',ctx);
  });
@@ -210,7 +210,7 @@ function disconnectRealtime(){
  for(const sub of realtimeSubs.values()){try{sub.unsubscribe()}catch(e){}}
  realtimeSubs.clear();
  if(centrifuge){try{centrifuge.disconnect()}catch(e){}centrifuge=null}
- $('chatInput').disabled=true;$('chatSend').disabled=true;
+ $('chatInput').disabled=false;$('chatSend').disabled=true;
 }
 function handleRealtime(m){
  if(!m||typeof m!=='object')return;

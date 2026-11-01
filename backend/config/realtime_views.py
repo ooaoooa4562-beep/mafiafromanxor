@@ -72,7 +72,7 @@ def connection_token(request):
         secret,
         algorithm="HS256",
     )
-    response = JsonResponse({"token": token})
+    response = JsonResponse({"token": token, "url": settings.CENTRIFUGO_PUBLIC_URL})
     response["Cache-Control"] = "no-store"
     return response
 
@@ -112,6 +112,18 @@ def subscription_token(request):
     response = JsonResponse({"token": token})
     response["Cache-Control"] = "no-store"
     return response
+
+
+
+@require_GET
+def room_chat_history(request, code):
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "authentication_required"}, status=401)
+    room = _room_and_member(code, request.user)
+    if room is None:
+        return JsonResponse({"detail": "room_not_found"}, status=404)
+    rows = RoomMessage.objects.filter(room=room).select_related("user").order_by("-created_at", "-id")[:50]
+    return JsonResponse({"messages": [_message_payload(row) for row in reversed(list(rows))]})
 
 
 @require_POST

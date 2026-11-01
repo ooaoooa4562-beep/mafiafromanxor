@@ -83,3 +83,77 @@ class RoomApiTests(TestCase):
         self.client.logout()
         response = self.client.get(reverse('rooms_collection'))
         self.assertEqual(response.status_code, 401)
+
+
+from unittest.mock import patch
+
+from django.test import override_settings
+from django.urls import reverse
+
+from rooms.models import RoomMessage
+
+
+@override_settings(
+    CENTRIFUGO_TOKEN_SECRET="test-centrifugo-secret",
+    CENTRIFUGO_PUBLIC_URL="wss://centrifugo.example.test/connection/websocket",
+)
+class RealtimeApiTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.host = User.objects.create_user(username="realtime_host", password="StrongPass!2026")
+        self.guest = User.objects.create_user(username="realtime_guest", password="StrongPass!2026")
+        self.outsider = User.objects.create_user(username="realtime_outsider", password="StrongPass!2026")
+        self.room = Room.objects.create(name="Realtime room", owner=self.host, max_players=8)
+        RoomPlayer.objects.create(room=self.room, user=self.host)
+        RoomPlayer.objects.create(room=self.room, user=self.guest)
+        self.client.force_login(self.host)
+
+    def test_connection_token_contains_user_and_public_endpoint(self):
+        response = self.client.get(reverse("realtime_connection_token"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["url"], "wss://centrifugo.example.test/connection/websocket")
+        claims = jwt.decode(response.json()["token"], "test-centrifugo-secret", algorithms=["HS256"])
+        self.assertEqual(claims["sub"], str(self.host.pk))
+
+    def test_subscription_token_only_allows_room_members(self):
+        channel = f"$room-{self.room.code}-chat"
+        response = self.client.get(reverse("realtime_subscription_token"), {"channel": channel})
+        self.assertEqual(response.status_code, 200)
+        claims = jwt.decode(response.json()["token"], "test-centrifugo-secret", algorithms=["HS256"])
+        self.assertEqual(claims["channel"], channel)
+
+        self.client.force_login(self.outsider)
+        denied = self.client.get(reverse("realtime_subscription_token"), {"channel": channel})
+        self.assertEqual(denied.status_code, 403)
+
+    @patch("config.realtime_views.publish")
+    def test_chat_message_is_saved_and_published(self, publish_mock):
+        response = self.client.post(
+            reverse("realtime_room_message", kwargs={"code": self.room.code}),
+            data=json.dumps({"message": "Hello from realtime"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(RoomMessage.objects.filter(room=self.room, user=self.host).count(), 1)
+        self.assertEqual(response.json()["message"]["content"], "Hello from realtime")
+        publish_mock.assert_called_once()
+        self.assertEqual(publish_mock.call_args.args[0], f"$room-{self.room.code}-chat")
+
+    @patch("config.realtime_views.publish")
+    def test_voice_join_and_signal_are_validated_and_published(self, publish_mock):
+        joined = self.client.post(reverse("realtime_voice_join", kwargs={"code": self.room.code}), data="{}", content_type="application/json")
+        self.assertEqual(joined.status_code, 200)
+        self.assertEqual(joined.json()["channel"], "lobby")
+
+        signal = self.client.post(
+            reverse("realtime_voice_signal", kwargs={"code": self.room.code}),
+            data=json.dumps({"signal_type": "offer", "payload": {"to": self.guest.pk, "description": {"type": "offer", "sdp": "test"}}}),
+            content_type="application/json",
+        )
+        self.assertEqual(signal.status_code, 200)
+        self.assertEqual(publish_mock.call_count, 2)
+
+    def test_chat_history_is_hidden_from_non_members(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse("realtime_room_chat_history", kwargs={"code": self.room.code}))
+        self.assertEqual(response.status_code, 404)

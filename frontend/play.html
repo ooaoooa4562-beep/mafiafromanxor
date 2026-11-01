@@ -128,6 +128,35 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #e0b8
 .chat-help{margin-top:8px;color:#b49d92;font-size:12px}
 @media(max-width:560px){.room-heading{align-items:flex-start;flex-direction:column}.chat-open-btn{width:100%}.chat-panel .chat-form{flex-direction:column;align-items:stretch}.chat-panel .chat-form button{width:100%}.chat-panel .chat-form input{min-height:48px}}
 
+
+/* FUTURE CHAT — neon glass, readable bubbles, responsive compose */
+.chat-panel{position:relative;isolation:isolate;overflow:hidden;border:1px solid #7160c966!important;border-radius:20px!important;background:radial-gradient(ellipse at 0% 0%,#765bff20,transparent 48%),radial-gradient(ellipse at 100% 100%,#22d3ee12,transparent 42%),linear-gradient(145deg,#111426f5,#0b1020f5)!important;box-shadow:0 18px 55px #0008,inset 0 1px #ffffff12!important;backdrop-filter:blur(18px)}
+.chat-panel:before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,#a78bfa,#67e8f9,transparent);opacity:.8;pointer-events:none}
+.chat-head{position:relative;padding:2px 2px 14px!important;border-bottom:1px solid #8b7bff2b!important}
+.chat-head strong{font:800 17px Manrope,sans-serif!important;letter-spacing:.02em;color:#f1efff!important}
+.chat-head .small{color:#929bb9!important}
+#chatStatus{padding:6px 10px;border:1px solid #42d9ba35;border-radius:999px;background:#18a98712;color:#7cebd0!important;font-size:11px!important;white-space:nowrap}
+.chat-messages{height:300px!important;max-height:48vh!important;min-height:190px!important;margin:14px 0!important;padding:14px 10px!important;gap:12px!important;border:1px solid #8b7bff20!important;border-radius:15px!important;background:linear-gradient(180deg,#080d1bd9,#0c1020e8)!important;scrollbar-width:thin;scrollbar-color:#7162b8 transparent}
+.chat-message{max-width:min(84%,560px)!important;padding:11px 14px!important;border:1px solid #6474a344!important;border-radius:5px 16px 16px 16px!important;background:linear-gradient(135deg,#1c2944,#172033)!important;box-shadow:0 7px 20px #0003!important;animation:chatRise .22s ease both}
+.chat-message.mine{border-color:#8b72f477!important;border-radius:16px 5px 16px 16px!important;background:linear-gradient(135deg,#38265f,#242044)!important;box-shadow:0 7px 22px #6545bd22!important}
+.chat-meta{gap:12px!important;margin-bottom:5px!important;color:#8e9bb9!important}
+.chat-meta b{font-size:12px!important;color:#a8d9ff!important}
+.chat-message.mine .chat-meta b{color:#d2bdff!important}
+.chat-meta time{font-size:10px!important;color:#7f89a7!important}
+.chat-text{font-size:14px!important;line-height:1.55!important;color:#f1f3ff!important;overflow-wrap:anywhere}
+.chat-empty{color:#8994b4!important}
+.chat-form{position:relative;gap:9px!important;padding-top:13px!important;border-top:1px solid #8b7bff20!important}
+.chat-panel .chat-form input{height:50px!important;min-height:50px!important;border:1px solid #6574a755!important;border-radius:14px!important;background:#080e1deF!important;color:#f7f7ff!important;box-shadow:inset 0 1px 5px #0005!important;transition:border-color .18s,box-shadow .18s!important}
+.chat-panel .chat-form input:focus{border-color:#9b87ff!important;box-shadow:0 0 0 4px #8b72f42b,0 0 24px #8b72f41c!important}
+.chat-panel .chat-form input::placeholder{color:#75809f!important}
+.chat-panel .chat-form button{min-height:50px!important;padding:0 19px!important;border:1px solid #b5a4ff66!important;border-radius:14px!important;background:linear-gradient(120deg,#7858df,#526de0 60%,#328da9)!important;color:#fff!important;font-weight:800!important;letter-spacing:.01em;box-shadow:0 7px 22px #5d54cf38!important;transition:transform .16s,filter .16s,box-shadow .16s!important}
+.chat-panel .chat-form button:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 10px 28px #5d54cf55!important}
+.chat-panel .chat-form button:disabled{opacity:.55;transform:none}
+.chat-help{color:#7f8ba9!important;font-size:11px!important}
+#chatError{color:#ff9baf!important}
+@keyframes chatRise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:560px){.chat-messages{height:250px!important;max-height:42vh!important}.chat-message{max-width:91%!important}.chat-panel .chat-form{flex-direction:row!important;align-items:center!important}.chat-panel .chat-form input{width:auto!important;flex:1!important}.chat-panel .chat-form button{width:auto!important;padding:0 14px!important}}
+@media(prefers-reduced-motion:reduce){.chat-message{animation:none!important}}
 </style><script src="https://cdn.jsdelivr.net/npm/centrifuge@5.4.0/dist/centrifuge.js"></script></head><body><div class="wrap"><header class="top"><div class="logo">ANXOR <span>MAFIA</span></div><div class="who"><span id="who">Гость</span><button class="btn ghost hidden" id="logout">Выйти</button><a class="btn ghost" href="/">На главную</a></div></header>
 <section id="auth" class="panel auth hidden"><h2>Добро пожаловать в город</h2><p class="muted">Войди или создай аккаунт, чтобы играть с друзьями.</p><div class="tabs"><button class="btn" id="tabLogin">Вход</button><button class="btn ghost" id="tabRegister">Регистрация</button></div><form id="authForm"><div class="field"><label>ЛОГИН</label><input id="username" autocomplete="username" required minlength="3"></div><div class="field hidden" id="nickWrap"><label>ИГРОВОЙ НИК</label><input id="nickname" maxlength="30"></div><div class="field"><label>ПАРОЛЬ</label><input id="password" type="password" autocomplete="current-password" required minlength="8"></div><button class="btn" style="width:100%" id="authSubmit">Войти</button></form><div class="error" id="authError"></div></section>
 <section id="gameApp" class="hidden"><div class="layout"><main class="panel"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><h2 id="mainTitle">Открытые комнаты</h2><div class="muted" id="mainSub">Найди компанию или создай собственный стол.</div></div><span class="tag" id="connection">● ONLINE</span></div>
@@ -136,7 +165,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #e0b8
 <section class="status chat-panel hidden" id="roomChat"><div class="chat-head"><div><strong>💬 Чат комнаты</strong><div class="small">Пиши сообщения игрокам за этим столом</div></div><span class="small" id="chatStatus">Подключение…</span></div><div class="chat-messages" id="chatMessages" aria-live="polite"><div class="chat-empty">Сообщения появятся здесь. Поздоровайся с игроками!</div></div><form class="chat-form" id="chatForm"><input id="chatInput" maxlength="1000" autocomplete="off" placeholder="Напиши сообщение здесь…" aria-label="Сообщение в чат"><button class="btn" id="chatSend" type="submit">Отправить</button></form><div class="chat-help">Нажми Enter или кнопку «Отправить», чтобы написать сообщение.</div><div class="small" id="chatError" role="status"></div></section><div class="status"><strong>Голосовая связь</strong><div class="muted" id="voiceStatus">Голосовой канал ещё не подключён.</div><div class="voice"><button class="btn" id="voiceJoin">🎙 Подключить микрофон</button><button class="btn ghost" id="voiceMute" disabled>Выключить микрофон</button><button class="btn ghost" id="voiceLeave" disabled>Отключить голос</button></div><div class="small">Голосовые каналы ограничиваются ролью и фазой партии. Нужен HTTPS или localhost.</div><div id="audioPeers"></div></div></div></main>
 <aside class="panel"><h2>Твоя статистика</h2><div id="stats" class="notice">Загружаем статистику…</div><div style="height:18px"></div><h2>Друзья</h2><p class="muted">Добавляй игроков по логину и принимай приглашения.</p><div class="field"><label>ЛОГИН ИЛИ ИГРОВОЙ НИК</label><div style="display:flex;gap:7px"><input id="friendName" placeholder="Логин или ник игрока" style="min-width:0;flex:1"><button class="btn ghost" id="addFriend">＋</button></div></div><div class="error" id="friendError"></div><div id="friendList" class="muted">Загрузка списка друзей…</div><div class="notice">Подсказка: поделись UUID комнаты с друзьями, чтобы они могли присоединиться.</div></aside></div></section></div>
 <script>
-const $=id=>document.getElementById(id);let authMode='login',me=null,roomCode=null,roomState=null,centrifuge=null,localStream=null,voiceJoined=false,muted=false,realtimeConnected=false,voiceChannel=null;const realtimeSubs=new Map(),peers=new Map(),pendingIce=new Map();let iceServersPromise=null;
+const $=id=>document.getElementById(id);let authMode='login',me=null,roomCode=null,roomState=null,centrifuge=null,localStream=null,voiceJoined=false,muted=false,realtimeConnected=false,voiceChannel=null,chatSyncTimer=null,chatSyncBusy=false;const realtimeSubs=new Map(),peers=new Map(),pendingIce=new Map();let iceServersPromise=null;
 async function getIceServers(){if(!iceServersPromise)iceServersPromise=api('/api/voice/ice-servers/').then(data=>data.ice_servers).catch(()=>[{urls:'stun:stun.l.google.com:19302'}]);return iceServersPromise}
 function cookie(name){return document.cookie.split('; ').find(v=>v.startsWith(name+'='))?.split('=').slice(1).join('=')||''}
 async function api(path,method='GET',body){const headers={};if(body!==undefined)headers['Content-Type']='application/json';if(!['GET','HEAD'].includes(method))headers['X-CSRFToken']=decodeURIComponent(cookie('csrftoken'));const r=await fetch(path,{method,headers,credentials:'same-origin',body:body===undefined?undefined:JSON.stringify(body)});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.detail||data.error||('HTTP '+r.status));return data}
@@ -161,7 +190,7 @@ $('startGame').onclick=async()=>{try{await api('/api/game/rooms/'+roomCode+'/sta
 function updateTimer(){const game=roomState?.game;if(!game||!game.phase_ends_at){$('phaseTimer').textContent='';return}const seconds=Math.max(0,Math.ceil((Date.parse(game.phase_ends_at)-Date.now())/1000));$('phaseTimer').textContent='До конца фазы: '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')}
 async function sendAction(id){try{const d=await api('/api/game/rooms/'+roomCode+'/action/','POST',{target_user_id:id});showError('gameError',d.investigation?('Проверка: '+(d.investigation.is_mafia?'подозреваемый — мафия':'подозреваемый не мафия')):'Ход принят.');await loadState()}catch(e){showError('gameError',e.message)}}
 $('copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(roomCode);$('copyCode').textContent='Скопировано ✓'}catch(e){prompt('Скопируй код комнаты',roomCode)}};
-$('leaveRoom').onclick=async()=>{const leaving=roomCode;if(!leaving)return;$('leaveRoom').disabled=true;try{await voiceLeave();await api('/api/rooms/'+leaving+'/leave/','POST',{});disconnectRealtime();localStorage.removeItem('mafia.activeRoom');roomCode=null;roomState=null;$('roomView').classList.add('hidden');$('lobby').classList.remove('hidden');$('mainTitle').textContent='Открытые комнаты';$('mainSub').textContent='Найди компанию или создай собственный стол.';showError('gameError','');await loadRooms()}catch(e){showError('gameError','Не удалось выйти из комнаты: '+e.message)}finally{$('leaveRoom').disabled=false}};
+$('leaveRoom').onclick=async()=>{const leaving=roomCode;if(!leaving)return;$('leaveRoom').disabled=true;try{await voiceLeave();await api('/api/rooms/'+leaving+'/leave/','POST',{});disconnectRealtime();if(chatSyncTimer){clearInterval(chatSyncTimer);chatSyncTimer=null}localStorage.removeItem('mafia.activeRoom');roomCode=null;roomState=null;$('roomView').classList.add('hidden');$('lobby').classList.remove('hidden');$('mainTitle').textContent='Открытые комнаты';$('mainSub').textContent='Найди компанию или создай собственный стол.';showError('gameError','');await loadRooms()}catch(e){showError('gameError','Не удалось выйти из комнаты: '+e.message)}finally{$('leaveRoom').disabled=false}};
 function roomChannel(kind){return '$room-'+roomCode+'-'+kind}
 async function subscribeRealtimeChannel(channel){
  if(!centrifuge||realtimeSubs.has(channel))return realtimeSubs.get(channel)||null;
@@ -204,6 +233,7 @@ async function connectRealtime(){
  await subscribeRealtimeChannel(roomChannel('game'));
  centrifuge.connect();
  try{const history=await api('/api/realtime/rooms/'+socketRoom+'/messages/history/');renderChatHistory(history.messages||[])}catch(e){$('chatError').textContent=e.message}
+  startChatSync(socketRoom);
 }
 function disconnectRealtime(){
  realtimeConnected=false;
@@ -348,6 +378,8 @@ function appendChatMessage(message){
  box.scrollTop=box.scrollHeight;
 }
 function renderChatHistory(messages){const box=$('chatMessages');if(messages.length){messages.forEach(appendChatMessage);return}if(!box.querySelector('.chat-message')){const empty=document.createElement('div');empty.className='chat-empty';empty.textContent='Пока сообщений нет. Начни разговор!';box.append(empty)}}
+async function syncChatHistory(expectedRoom=roomCode){if(!expectedRoom||expectedRoom!==roomCode||chatSyncBusy)return;chatSyncBusy=true;try{const history=await api('/api/realtime/rooms/'+expectedRoom+'/messages/history/');if(expectedRoom===roomCode)renderChatHistory(history.messages||[])}catch(error){console.warn('Chat history sync failed',error)}finally{chatSyncBusy=false}}
+function startChatSync(expectedRoom){if(chatSyncTimer)clearInterval(chatSyncTimer);chatSyncTimer=setInterval(()=>syncChatHistory(expectedRoom),2000)}
 $('chatForm').onsubmit=async e=>{
  e.preventDefault();const message=$('chatInput').value.trim();if(!message)return;
  if(!roomCode){$('chatError').textContent='Сначала войди в комнату.';return}

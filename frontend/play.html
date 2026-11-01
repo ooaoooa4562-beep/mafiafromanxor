@@ -170,7 +170,7 @@ async function subscribeRealtimeChannel(channel){
  });
  sub.on('publication',ctx=>handleRealtime(ctx.data));
  sub.on('subscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=false;$('chatSend').disabled=false}});
- sub.on('unsubscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=false;$('chatSend').disabled=true}});
+ sub.on('unsubscribed',()=>{if(channel.endsWith('-chat')){$('chatInput').disabled=false}});
  sub.on('error',ctx=>console.warn('Centrifugo subscription error',ctx));
  realtimeSubs.set(channel,sub);sub.subscribe();return sub;
 }
@@ -196,8 +196,8 @@ async function connectRealtime(){
  centrifuge.on('disconnected',ctx=>{
   if(roomCode!==socketRoom)return;
   realtimeConnected=false;$('connection').textContent='● НЕТ СВЯЗИ';$('connection').style.color='var(--red)';
-  $('chatInput').disabled=false;$('chatSend').disabled=true;
-  $('chatStatus').textContent='Связь потеряна · переподключаемся…';
+  $('chatInput').disabled=false;
+  $('chatStatus').textContent='Связь потеряна · отправка доступна, переподключаемся…';
   console.warn('Centrifugo disconnected',ctx);
  });
  await subscribeRealtimeChannel(roomChannel('chat'));
@@ -210,7 +210,7 @@ function disconnectRealtime(){
  for(const sub of realtimeSubs.values()){try{sub.unsubscribe()}catch(e){}}
  realtimeSubs.clear();
  if(centrifuge){try{centrifuge.disconnect()}catch(e){}centrifuge=null}
- $('chatInput').disabled=false;$('chatSend').disabled=true;
+ $('chatInput').disabled=false;
 }
 function handleRealtime(m){
  if(!m||typeof m!=='object')return;
@@ -326,7 +326,7 @@ $('chatToggle').onclick=()=>{
  $('chatToggle').textContent=opening?'✕ Закрыть чат':'💬 Открыть чат';
  if(opening){
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
-  if(realtimeConnected){$('chatInput').disabled=false;$('chatSend').disabled=false}
+  $('chatInput').disabled=false;
   window.setTimeout(()=>$('chatInput').focus({preventScroll:true}),180);
  }
 };
@@ -350,13 +350,13 @@ function appendChatMessage(message){
 function renderChatHistory(messages){const box=$('chatMessages');if(messages.length){messages.forEach(appendChatMessage);return}if(!box.querySelector('.chat-message')){const empty=document.createElement('div');empty.className='chat-empty';empty.textContent='Пока сообщений нет. Начни разговор!';box.append(empty)}}
 $('chatForm').onsubmit=async e=>{
  e.preventDefault();const message=$('chatInput').value.trim();if(!message)return;
- if(!realtimeConnected){$('chatError').textContent='Нет соединения с сервером. Подожди переподключения.';return}
+ if(!roomCode){$('chatError').textContent='Сначала войди в комнату.';return}
  $('chatSend').disabled=true;
  try{
   const result=await api('/api/realtime/rooms/'+roomCode+'/messages/','POST',{message});
   appendChatMessage(result.message);$('chatInput').value='';$('chatError').textContent='';
  }catch(error){$('chatError').textContent=error.message}
- finally{$('chatSend').disabled=!realtimeConnected}
+ finally{$('chatSend').disabled=false}
 };
 
 async function loadStats(){try{const d=await api('/api/game/stats/');$('stats').textContent='Сыграно: '+d.played+' · Побед: '+d.wins+' · Поражений: '+d.losses+' · Побед: '+d.win_rate+'%'}catch(e){$('stats').textContent=e.message}}

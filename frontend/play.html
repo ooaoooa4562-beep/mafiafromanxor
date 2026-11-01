@@ -214,7 +214,11 @@ function disconnectRealtime(){
 }
 function handleRealtime(m){
  if(!m||typeof m!=='object')return;
- if(m.type==='game.started'||m.type==='game.updated'||m.type==='room.updated')loadState();
+ if(m.type==='game.started'||m.type==='game.updated'){
+  const previousPhase=roomState?.game?.phase;
+  loadState().then(()=>{if(voiceJoined&&previousPhase!==roomState?.game?.phase){voiceLeave();$('voiceStatus').textContent='Фаза игры изменилась. Подключи голос заново.'}});
+ }
+ if(m.type==='room.updated')loadState();
  if(m.type==='chat.message')appendChatMessage(m.message);
  if(m.type==='voice.presence'&&Number(m.user_id)!==Number(me.id)&&m.state==='joined'&&Number(me.id)<Number(m.user_id))
   createPeer(m.user_id,true).catch(err=>{$('voiceStatus').textContent='Не удалось подключить собеседника: '+err.message});

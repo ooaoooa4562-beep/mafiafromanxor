@@ -161,7 +161,66 @@ function updateTimer(){const game=roomState?.game;if(!game||!game.phase_ends_at)
 async function sendAction(id){try{const d=await api('/api/game/rooms/'+roomCode+'/action/','POST',{target_user_id:id});showError('gameError',d.investigation?('Проверка: '+(d.investigation.is_mafia?'подозреваемый — мафия':'подозреваемый не мафия')):'Ход принят.');await loadState()}catch(e){showError('gameError',e.message)}}
 $('copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(roomCode);$('copyCode').textContent='Скопировано ✓'}catch(e){prompt('Скопируй код комнаты',roomCode)}};
 $('leaveRoom').onclick=async()=>{const leaving=roomCode;if(!leaving)return;voiceLeave();$('leaveRoom').disabled=true;try{await api('/api/rooms/'+leaving+'/leave/','POST',{});if(ws){ws.close();ws=null}roomCode=null;roomState=null;$('roomView').classList.add('hidden');$('lobby').classList.remove('hidden');$('mainTitle').textContent='Открытые комнаты';$('mainSub').textContent='Найди компанию или создай собственный стол.';showError('gameError','');await loadRooms()}catch(e){showError('gameError','Не удалось выйти из комнаты: '+e.message)}finally{$('leaveRoom').disabled=false}};
-function connectSocket(){if(ws)ws.close();const scheme=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(scheme+'//'+location.host+'/ws/rooms/'+roomCode+'/');ws.onopen=()=>{$('connection').textContent='● REALTIME';$('connection').style.color='var(--green)';$('chatStatus').textContent='В сети';$('chatInput').disabled=false;$('chatSend').disabled=false};ws.onclose=()=>{$('connection').textContent='● OFFLINE';$('connection').style.color='var(--red)';$('chatStatus').textContent='Нет соединения';$('chatInput').disabled=true;$('chatSend').disabled=true};ws.onmessage=async e=>{const m=JSON.parse(e.data);if(m.type==='game.started'||m.type==='game.updated'||m.type==='room.updated')await loadState();if(m.type==='chat.history'){renderChatHistory(m.messages||[])}if(m.type==='chat.message'){appendChatMessage(m.message)}if(m.type==='chat.error')$('chatError').textContent=m.detail||'Не удалось отправить сообщение.';if(m.type==='voice.joined'){voiceJoined=true;$('voiceStatus').textContent='Голос активен · '+m.channel;$('voiceMute').disabled=false;$('voiceLeave').disabled=false;$('voiceJoin').disabled=true}if(m.type==='voice.presence'&&m.state==='joined'&&Number(me.id)<Number(m.user_id))createPeer(m.user_id,true).catch(err=>{$('voiceStatus').textContent='Не удалось подключить собеседника: '+err.message});if(m.type==='voice.presence'&&m.state==='left'){const peer=peers.get(m.user_id);if(peer){peer.close();peers.delete(m.user_id)}document.getElementById('peer-'+m.user_id)?.remove()}if(m.type==='voice.signal')handleSignal(m);if(m.type==='voice.denied'||m.type==='voice.rejoin_required'){$('voiceStatus').textContent=m.detail||'Фаза игры изменилась. Переподключи голос.';voiceLeave(false)}if(m.type==='voice.left')$('voiceStatus').textContent='Голос отключён.'}}
+let reconnectTimer=null,reconnectAttempts=0;
+function connectSocket(){
+ if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null}
+ if(ws){const previous=ws;ws=null;previous.onclose=null;try{previous.close()}catch(e){}}
+ if(!roomCode)return;
+ const socketRoom=roomCode;
+ const scheme=location.protocol==='https:'?'wss:':'ws:';
+ let socket;
+ try{socket=new WebSocket(scheme+'//'+location.host+'/ws/rooms/'+socketRoom+'/')}catch(error){scheduleSocketReconnect(socketRoom);return}
+ ws=socket;
+ socket.onopen=()=>{
+  if(ws!==socket||roomCode!==socketRoom){socket.close();return}
+  reconnectAttempts=0;
+  $('connection').textContent='● НА СВЯЗИ';$('connection').style.color='var(--green)';
+  $('chatStatus').textContent='В сети';$('chatInput').disabled=false;$('chatSend').disabled=false;
+  $('chatError').textContent='';
+ };
+ socket.onerror=()=>{if(ws===socket)$('chatStatus').textContent='Пробуем восстановить связь…'};
+ socket.onclose=event=>{
+  if(ws!==socket)return;
+  ws=null;
+  $('connection').textContent='● НЕТ СВЯЗИ';$('connection').style.color='var(--red)';
+  $('chatInput').disabled=true;$('chatSend').disabled=true;
+  if(event.code===4401){
+   $('chatStatus').textContent='Сессия истекла';$('chatError').textContent='Войди в аккаунт заново, чтобы пользоваться чатом.';
+   return;
+  }
+  if(event.code===4403){
+   $('chatStatus').textContent='Нет доступа к комнате';$('chatError').textContent='Похоже, ты больше не состоишь в этой комнате. Выйди и зайди снова.';
+   return;
+  }
+  $('chatStatus').textContent='Соединение потеряно · переподключаемся…';
+  scheduleSocketReconnect(socketRoom);
+ };
+ socket.onmessage=async e=>{
+  if(ws!==socket)return;
+  let m;try{m=JSON.parse(e.data)}catch(error){return}
+  if(m.type==='connected'){$('chatStatus').textContent='В сети'}
+  if(m.type==='game.started'||m.type==='game.updated'||m.type==='room.updated')await loadState();
+  if(m.type==='chat.history'){renderChatHistory(m.messages||[])}
+  if(m.type==='chat.message'){appendChatMessage(m.message)}
+  if(m.type==='chat.error')$('chatError').textContent=m.detail||'Не удалось отправить сообщение.';
+  if(m.type==='voice.joined'){voiceJoined=true;$('voiceStatus').textContent='Голос активен · '+m.channel;$('voiceMute').disabled=false;$('voiceLeave').disabled=false;$('voiceJoin').disabled=true}
+  if(m.type==='voice.presence'&&m.state==='joined'&&Number(me.id)<Number(m.user_id))createPeer(m.user_id,true).catch(err=>{$('voiceStatus').textContent='Не удалось подключить собеседника: '+err.message});
+  if(m.type==='voice.presence'&&m.state==='left'){const peer=peers.get(m.user_id);if(peer){peer.close();peers.delete(m.user_id)}document.getElementById('peer-'+m.user_id)?.remove()}
+  if(m.type==='voice.signal')handleSignal(m);
+  if(m.type==='voice.denied'||m.type==='voice.rejoin_required'){$('voiceStatus').textContent=m.detail||'Фаза игры изменилась. Переподключи голос.';voiceLeave(false)}
+  if(m.type==='voice.left')$('voiceStatus').textContent='Голос отключён.';
+ };
+}
+function scheduleSocketReconnect(expectedRoom){
+ if(reconnectTimer||!roomCode||roomCode!==expectedRoom)return;
+ const delay=Math.min(15000,1000*Math.pow(2,Math.min(reconnectAttempts,4)));
+ reconnectAttempts++;
+ $('chatStatus').textContent='Переподключение через '+Math.ceil(delay/1000)+' сек…';
+ reconnectTimer=setTimeout(()=>{
+  reconnectTimer=null;
+  if(roomCode===expectedRoom)connectSocket();
+ },delay);
+}
 async function ensureStream(){
  if(localStream&&localStream.getAudioTracks().some(track=>track.readyState==='live'))return localStream;
  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('Микрофон доступен только на защищённом HTTPS-сайте. Открой игру по адресу https://…');
